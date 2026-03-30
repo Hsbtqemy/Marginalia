@@ -28,17 +28,17 @@ export async function buildMenu(state: MenuState, handlers: MenuHandlers): Promi
     items: [
       await MenuItem.new({
         id: "file.export_docx_clean",
-        text: "Export DOCX (Clean)",
+        text: "Export DOCX (Clean Draft)",
         action: () => handlers.onExportDocxClean(),
       }),
       await MenuItem.new({
         id: "file.export_docx_working",
-        text: "Export DOCX (Working: comments+footnotes)",
+        text: "Export DOCX (Working Draft: comments + footnotes)",
         action: () => handlers.onExportDocxWorking(),
       }),
       await MenuItem.new({
         id: "file.export_pdf",
-        text: "Export PDF (Print…)",
+        text: "Print or Save PDF...",
         action: () => handlers.onExportPdf(),
       }),
     ],
@@ -55,12 +55,12 @@ export async function buildMenu(state: MenuState, handlers: MenuHandlers): Promi
       }),
       await MenuItem.new({
         id: "file.rename_document",
-        text: "Rename Document",
+        text: "Rename This Document",
         action: () => handlers.onRenameDocument(),
       }),
       await MenuItem.new({
         id: "file.delete_document",
-        text: "Delete Document",
+        text: "Delete This Document",
         action: () => handlers.onDeleteDocument(),
       }),
       await PredefinedMenuItem.new({ item: "Separator" }),
@@ -109,13 +109,13 @@ export async function buildMenu(state: MenuState, handlers: MenuHandlers): Promi
     items: [
       await CheckMenuItem.new({
         id: "view.toggle_page_preview",
-        text: "Toggle Page Preview",
+        text: "Show Page Preview",
         checked: state.pagePreview,
         action: () => handlers.onTogglePagePreview(),
       }),
       await CheckMenuItem.new({
         id: "view.toggle_right_pane",
-        text: "Toggle Right Pane",
+        text: "Show Right Notes",
         checked: state.rightPaneVisible,
         action: () => handlers.onToggleRightPane(),
       }),
@@ -135,7 +135,7 @@ export async function buildMenu(state: MenuState, handlers: MenuHandlers): Promi
     items: [
       await MenuItem.new({
         id: "tools.export_presets",
-        text: "Export Presets…",
+        text: "Manage Export Styles...",
         action: () => handlers.onOpenPresetManager(),
       }),
     ],

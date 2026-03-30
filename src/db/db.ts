@@ -1,5 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 import migration001 from "./migrations/001_initial.sql?raw";
+import { splitStatements } from "./sqlStatements";
 
 export const APP_DB_PATH = "sqlite:app.db";
 
@@ -9,13 +10,7 @@ interface MigrationDef {
 }
 
 const MIGRATIONS: MigrationDef[] = [{ version: 1, sql: migration001 }];
-
-function splitStatements(sql: string): string[] {
-  return sql
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
-}
+const WRITE_QUEUES = new WeakMap<Database, Promise<void>>();
 
 async function runStatements(db: Database, sql: string): Promise<void> {
   const statements = splitStatements(sql);
@@ -35,6 +30,31 @@ async function appliedMigrationVersions(db: Database): Promise<Set<number>> {
   return new Set(rows.map((row) => row.version));
 }
 
+export async function runInTransaction<T>(db: Database, work: () => Promise<T>): Promise<T> {
+  await db.execute("BEGIN");
+  try {
+    const result = await work();
+    await db.execute("COMMIT");
+    return result;
+  } catch (error) {
+    await db.execute("ROLLBACK");
+    throw error;
+  }
+}
+
+export async function runSerializedWrite<T>(db: Database, work: () => Promise<T>): Promise<T> {
+  const previous = WRITE_QUEUES.get(db) ?? Promise.resolve();
+  const result = previous.catch(() => undefined).then(work);
+  WRITE_QUEUES.set(
+    db,
+    result.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return result;
+}
+
 export async function openAppDatabase(): Promise<Database> {
   const db = await Database.load(APP_DB_PATH);
   await db.execute("PRAGMA foreign_keys = ON");
@@ -46,18 +66,13 @@ export async function openAppDatabase(): Promise<Database> {
       continue;
     }
 
-    await db.execute("BEGIN");
-    try {
+    await runInTransaction(db, async () => {
       await runStatements(db, migration.sql);
       await db.execute("INSERT INTO schema_migrations(version, applied_at) VALUES ($1, $2)", [
         migration.version,
         Date.now(),
       ]);
-      await db.execute("COMMIT");
-    } catch (error) {
-      await db.execute("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   return db;

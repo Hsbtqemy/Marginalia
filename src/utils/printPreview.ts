@@ -19,12 +19,106 @@ function buildFontStack(preset: ExportPreset): string {
   return family.join(", ");
 }
 
+const ALLOWED_TAGS = new Set([
+  "a",
+  "blockquote",
+  "br",
+  "em",
+  "h1",
+  "h2",
+  "h3",
+  "i",
+  "li",
+  "ol",
+  "p",
+  "strong",
+  "u",
+  "ul",
+]);
+
+function isSafeHref(value: string): boolean {
+  if (value.startsWith("#") || value.startsWith("/")) {
+    return true;
+  }
+
+  try {
+    const url = new URL(value, "https://marginalia.local");
+    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:";
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeNode(node: Node, document: Document): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return document.createTextNode(node.textContent ?? "");
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return null;
+  }
+
+  const element = node as HTMLElement;
+  const tagName = element.tagName.toLowerCase();
+
+  if (!ALLOWED_TAGS.has(tagName)) {
+    const fragment = document.createDocumentFragment();
+    for (const child of [...element.childNodes]) {
+      const sanitizedChild = sanitizeNode(child, document);
+      if (sanitizedChild) {
+        fragment.appendChild(sanitizedChild);
+      }
+    }
+    return fragment;
+  }
+
+  const clean = document.createElement(tagName);
+
+  if (tagName === "a") {
+    const href = element.getAttribute("href");
+    if (href && isSafeHref(href)) {
+      clean.setAttribute("href", href);
+      clean.setAttribute("rel", "noreferrer noopener");
+      clean.setAttribute("target", "_blank");
+    }
+  }
+
+  for (const child of [...element.childNodes]) {
+    const sanitizedChild = sanitizeNode(child, document);
+    if (sanitizedChild) {
+      clean.appendChild(sanitizedChild);
+    }
+  }
+
+  return clean;
+}
+
+export function sanitizePrintPreviewHtmlFragment(html: string): string {
+  if (typeof DOMParser === "undefined" || typeof document === "undefined") {
+    return escapeHtml(html);
+  }
+
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, "text/html");
+  const container = document.createElement("div");
+
+  for (const child of [...parsed.body.childNodes]) {
+    const sanitizedChild = sanitizeNode(child, document);
+    if (sanitizedChild) {
+      container.appendChild(sanitizedChild);
+    }
+  }
+
+  return container.innerHTML;
+}
+
 export function buildPrintPreviewHtml(options: {
   title: string;
   manuscriptHtml: string;
   preset: ExportPreset;
 }): string {
   const { title, manuscriptHtml, preset } = options;
+  const safeManuscriptHtml = sanitizePrintPreviewHtmlFragment(manuscriptHtml);
   const pageSize = preset.pageSize === "A4" ? "A4" : "Letter";
   const pageWidthMm = pageSize === "A4" ? 210 : 216;
 
@@ -33,6 +127,7 @@ export function buildPrintPreviewHtml(options: {
   <head>
     <meta charset="utf-8" />
     <title>${escapeHtml(title)}</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; navigate-to https: http: mailto:;" />
     <style>
       :root {
         --preview-font-family: ${buildFontStack(preset)};
@@ -126,7 +221,7 @@ export function buildPrintPreviewHtml(options: {
   </head>
   <body>
     <main class="print-root">
-      <article class="print-page print-content">${manuscriptHtml}</article>
+      <article class="print-page print-content">${safeManuscriptHtml}</article>
     </main>
   </body>
 </html>`;

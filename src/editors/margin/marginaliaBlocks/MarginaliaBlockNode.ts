@@ -30,6 +30,8 @@ export interface SerializedMarginaliaBlockNode extends Spread<
 
 const MARGINALIA_HANDLE_SELECTOR = '[data-marginalia-handle="true"]';
 const MARGINALIA_CONTENT_SLOT_SELECTOR = '[data-marginalia-content-slot="true"]';
+const MARGINALIA_META_SELECTOR = '[data-marginalia-meta="true"]';
+const MARGINALIA_PREVIEW_SELECTOR = '[data-marginalia-preview="true"]';
 
 function createBlockHandle(marginBlockId: string): HTMLButtonElement {
   const handle = document.createElement("button");
@@ -51,7 +53,12 @@ function createBlockHeader(marginBlockId: string): HTMLDivElement {
   const header = document.createElement("div");
   header.className = "marginalia-block-header";
   header.contentEditable = "false";
+  const meta = document.createElement("span");
+  meta.className = "marginalia-block-meta";
+  meta.dataset.marginaliaMeta = "true";
+  meta.textContent = "Standalone";
   header.append(createBlockHandle(marginBlockId));
+  header.append(meta);
   return header;
 }
 
@@ -60,6 +67,14 @@ function createBlockContentSlot(): HTMLDivElement {
   contentSlot.className = "marginalia-block-content-slot";
   contentSlot.dataset.marginaliaContentSlot = "true";
   return contentSlot;
+}
+
+function createBlockPreview(): HTMLDivElement {
+  const preview = document.createElement("div");
+  preview.className = "marginalia-block-preview";
+  preview.dataset.marginaliaPreview = "true";
+  preview.hidden = true;
+  return preview;
 }
 
 function convertMarginaliaBlockElement(domNode: HTMLElement): DOMConversionOutput {
@@ -155,7 +170,17 @@ export class MarginaliaBlockNode extends ElementNode {
     if (this.__linkedManuscriptBlockId) {
       element.dataset.linkedManuscriptBlockId = this.__linkedManuscriptBlockId;
     }
-    element.append(createBlockHeader(this.__marginBlockId), createBlockContentSlot());
+    element.append(createBlockHeader(this.__marginBlockId), createBlockPreview(), createBlockContentSlot());
+    const meta = element.querySelector<HTMLElement>(MARGINALIA_META_SELECTOR);
+    if (meta) {
+      meta.textContent = this.__linkedManuscriptBlockId
+        ? `Linked to ${this.__linkedManuscriptBlockId.slice(0, 8)}`
+        : "Standalone";
+    }
+    const preview = element.querySelector<HTMLElement>(MARGINALIA_PREVIEW_SELECTOR);
+    if (preview) {
+      preview.hidden = !this.__linkedManuscriptBlockId;
+    }
     return element;
   }
 
@@ -186,6 +211,17 @@ export class MarginaliaBlockNode extends ElementNode {
       } else {
         delete dom.dataset.linkedManuscriptBlockId;
       }
+    }
+
+    const meta = dom.querySelector<HTMLElement>(MARGINALIA_META_SELECTOR);
+    if (meta) {
+      meta.textContent = this.__linkedManuscriptBlockId
+        ? `Linked to ${this.__linkedManuscriptBlockId.slice(0, 8)}`
+        : "Standalone";
+    }
+    const preview = dom.querySelector<HTMLElement>(MARGINALIA_PREVIEW_SELECTOR);
+    if (preview) {
+      preview.hidden = !this.__linkedManuscriptBlockId;
     }
 
     return false;

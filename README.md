@@ -57,6 +57,16 @@ npm install
 npm run tauri:build
 ```
 
+## Local verification
+
+```bash
+npm install
+npm run lint:colors
+npm test
+npm run build
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
 ## Project layout
 
 - `src/app/App.tsx`: app orchestration, bootstrap, menu handlers, export actions
@@ -121,6 +131,18 @@ Profiles:
 
 Preset fields (font, spacing, page size, margins, heading scale) are applied to DOCX output.
 
+Current DOCX guarantees:
+- paragraph, heading, quote, and basic list structure
+- working-profile comments from left marginalia
+- working-profile footnotes from right marginalia
+- preset-driven font, spacing, page size, and margins
+
+Current DOCX limitations:
+- no full-fidelity round-trip of arbitrary Lexical markup
+- limited inline-style preservation
+- no advanced nested structure rendering guarantees
+- output is semantic/structured first, not strict WYSIWYG
+
 ### PDF
 
 MVP flow:
@@ -128,6 +150,11 @@ MVP flow:
 - Open print preview modal
 - Trigger system print dialog (`window.print()` from preview iframe)
 - Save as PDF from OS print UI
+
+Security notes:
+- print preview HTML is sanitized before injection
+- preview iframe uses a restrictive inline CSP
+- the desktop CSP is no longer disabled globally
 
 ## Accessibility + theming
 
@@ -144,4 +171,4 @@ MVP flow:
 ## Notes
 
 - This implementation is desktop-first for macOS/Windows/Linux.
-- Current local environment built frontend and passed Rust `cargo check`.
+- On Windows, Rust builds also require the MSVC linker from Visual Studio C++ Build Tools.

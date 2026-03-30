@@ -5,6 +5,7 @@ export type RightMarginEditorHandle = MarginEditorHandle;
 
 interface RightMarginEditorProps {
   initialStateJson: string;
+  manuscriptExcerptByBlockId: Record<string, string>;
   onAutosave: (lexicalJson: string) => void;
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
@@ -17,8 +18,9 @@ export const RightMarginEditor = forwardRef<RightMarginEditorHandle, RightMargin
       <MarginEditorBase
         ref={ref}
         kind="right"
-        title="Citations / Notes"
+        title="Sources & Notes"
         initialStateJson={props.initialStateJson}
+        manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
         onAutosave={props.onAutosave}
         onCurrentBlockIdChange={props.onCurrentBlockIdChange}
         onLinkIndexChange={props.onLinkIndexChange}

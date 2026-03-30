@@ -116,12 +116,12 @@ export function PresetManager(props: PresetManagerProps) {
   };
 
   return (
-    <div className="preset-manager-overlay" role="dialog" aria-modal="true" aria-label="Export presets">
+    <div className="preset-manager-overlay" role="dialog" aria-modal="true" aria-label="Export styles">
       <div className="preset-manager">
         <div className="modal-header">
-          <strong>Export Presets</strong>
+          <strong>Export Styles</strong>
           <label className="app-chip" htmlFor="default-preset-select">
-            Default:
+            Default style:
             <select
               id="default-preset-select"
               className="app-select"
@@ -136,7 +136,7 @@ export function PresetManager(props: PresetManagerProps) {
             </select>
           </label>
           <button type="button" className="ghost-button" onClick={props.onClose}>
-            Close
+            Cancel
           </button>
         </div>
 
@@ -145,10 +145,10 @@ export function PresetManager(props: PresetManagerProps) {
             <div>
               <div className="preset-actions">
                 <button type="button" className="secondary-button" onClick={duplicateSelected}>
-                  Duplicate
+                  Make a Copy
                 </button>
                 <button type="button" className="ghost-button" onClick={deleteSelected} disabled={!selectedPreset || selectedPreset.builtIn}>
-                  Delete
+                  Delete Style
                 </button>
               </div>
               <div className="preset-list">
@@ -171,7 +171,7 @@ export function PresetManager(props: PresetManagerProps) {
             </div>
 
             {!draft ? (
-              <div className="empty-state">Select a preset to edit.</div>
+              <div className="empty-state">Select an export style to edit.</div>
             ) : (
               <form
                 className="preset-form"
@@ -189,7 +189,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Font Family
+                  Typeface
                   <input
                     value={draft.fontFamily}
                     onChange={(event) => setDraft(nextDraft(draft, { fontFamily: event.target.value }))}
@@ -197,7 +197,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Fallbacks (comma-separated)
+                  Fallback typefaces (comma-separated)
                   <input
                     value={stringifyFallbacks(draft.fontFallbacks)}
                     onChange={(event) => setDraft(nextDraft(draft, { fontFallbacks: parseFallbacks(event.target.value) }))}
@@ -205,7 +205,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Font Size (pt)
+                  Text Size (pt)
                   <input
                     type="number"
                     min={8}
@@ -217,7 +217,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Line Height
+                  Line Spacing
                   <input
                     type="number"
                     min={1}
@@ -229,7 +229,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Paragraph Before (pt)
+                  Space Before Paragraph (pt)
                   <input
                     type="number"
                     min={0}
@@ -241,7 +241,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Paragraph After (pt)
+                  Space After Paragraph (pt)
                   <input
                     type="number"
                     min={0}
@@ -264,7 +264,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Margin Top (mm)
+                  Top Margin (mm)
                   <input
                     type="number"
                     min={10}
@@ -276,7 +276,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Margin Right (mm)
+                  Right Margin (mm)
                   <input
                     type="number"
                     min={10}
@@ -288,7 +288,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Margin Bottom (mm)
+                  Bottom Margin (mm)
                   <input
                     type="number"
                     min={10}
@@ -300,7 +300,7 @@ export function PresetManager(props: PresetManagerProps) {
                 </label>
 
                 <label>
-                  Margin Left (mm)
+                  Left Margin (mm)
                   <input
                     type="number"
                     min={10}
@@ -359,10 +359,10 @@ export function PresetManager(props: PresetManagerProps) {
 
         <div className="modal-footer">
           <button type="button" className="secondary-button" onClick={duplicateSelected}>
-            Duplicate
+            Make a Copy
           </button>
           <button type="button" className="primary-button" onClick={saveDraft}>
-            Save
+            Save Style
           </button>
         </div>
       </div>

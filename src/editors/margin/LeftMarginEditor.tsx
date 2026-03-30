@@ -5,6 +5,7 @@ export type LeftMarginEditorHandle = MarginEditorHandle;
 
 interface LeftMarginEditorProps {
   initialStateJson: string;
+  manuscriptExcerptByBlockId: Record<string, string>;
   onAutosave: (lexicalJson: string) => void;
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
@@ -19,6 +20,7 @@ export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEdi
         kind="left"
         title="Marginalia"
         initialStateJson={props.initialStateJson}
+        manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
         onAutosave={props.onAutosave}
         onCurrentBlockIdChange={props.onCurrentBlockIdChange}
         onLinkIndexChange={props.onLinkIndexChange}

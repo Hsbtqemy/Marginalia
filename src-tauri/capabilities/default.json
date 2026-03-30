@@ -9,9 +9,6 @@
     "sql:default",
     "sql:allow-execute",
     "store:default",
-    "dialog:default",
-    "fs:default",
-    "clipboard-manager:allow-read-text",
-    "clipboard-manager:allow-write-text"
+    "dialog:default"
   ]
 }

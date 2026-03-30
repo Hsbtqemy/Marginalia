@@ -7,6 +7,7 @@ import {
   normalizePreset,
 } from "../presets/presetSchema";
 import { newUuid } from "../utils/uuid";
+import { runInTransaction, runSerializedWrite } from "./db";
 
 export interface DocumentRecord {
   id: string;
@@ -192,16 +193,20 @@ export async function createDocument(db: Database, title = DEFAULT_DOCUMENT_TITL
   const now = Date.now();
   const id = newUuid();
 
-  await db.execute("INSERT INTO documents(id, title, created_at, updated_at) VALUES ($1, $2, $3, $4)", [
-    id,
-    title,
-    now,
-    now,
-  ]);
+  await runSerializedWrite(db, async () => {
+    await runInTransaction(db, async () => {
+      await ensureBuiltInPresets(db);
+      await db.execute("INSERT INTO documents(id, title, created_at, updated_at) VALUES ($1, $2, $3, $4)", [
+        id,
+        title,
+        now,
+        now,
+      ]);
 
-  await ensureDocumentStates(db, id);
-  await ensureBuiltInPresets(db);
-  await ensureDocumentExportSetting(db, id, BUILTIN_PRESETS[0].id);
+      await ensureDocumentStates(db, id);
+      await ensureDocumentExportSetting(db, id, BUILTIN_PRESETS[0].id);
+    });
+  });
 
   return {
     id,
@@ -212,11 +217,15 @@ export async function createDocument(db: Database, title = DEFAULT_DOCUMENT_TITL
 }
 
 export async function renameDocument(db: Database, documentId: string, title: string): Promise<void> {
-  await db.execute("UPDATE documents SET title = $1, updated_at = $2 WHERE id = $3", [title, Date.now(), documentId]);
+  await runSerializedWrite(db, async () => {
+    await db.execute("UPDATE documents SET title = $1, updated_at = $2 WHERE id = $3", [title, Date.now(), documentId]);
+  });
 }
 
 export async function deleteDocument(db: Database, documentId: string): Promise<void> {
-  await db.execute("DELETE FROM documents WHERE id = $1", [documentId]);
+  await runSerializedWrite(db, async () => {
+    await db.execute("DELETE FROM documents WHERE id = $1", [documentId]);
+  });
 }
 
 export async function getDocumentStateBundle(db: Database, documentId: string): Promise<DocumentStateBundle> {
@@ -254,29 +263,35 @@ async function touchDocument(db: Database, documentId: string): Promise<void> {
 
 export async function saveManuscriptState(db: Database, documentId: string, lexicalJson: string): Promise<void> {
   const now = Date.now();
-  await db.execute(
-    "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
-    [documentId, lexicalJson, now],
-  );
-  await touchDocument(db, documentId);
+  await runSerializedWrite(db, async () => {
+    await db.execute(
+      "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+      [documentId, lexicalJson, now],
+    );
+    await touchDocument(db, documentId);
+  });
 }
 
 export async function saveLeftMarginState(db: Database, documentId: string, lexicalJson: string): Promise<void> {
   const now = Date.now();
-  await db.execute(
-    "INSERT INTO margin_left_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
-    [documentId, lexicalJson, now],
-  );
-  await touchDocument(db, documentId);
+  await runSerializedWrite(db, async () => {
+    await db.execute(
+      "INSERT INTO margin_left_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+      [documentId, lexicalJson, now],
+    );
+    await touchDocument(db, documentId);
+  });
 }
 
 export async function saveRightMarginState(db: Database, documentId: string, lexicalJson: string): Promise<void> {
   const now = Date.now();
-  await db.execute(
-    "INSERT INTO margin_right_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
-    [documentId, lexicalJson, now],
-  );
-  await touchDocument(db, documentId);
+  await runSerializedWrite(db, async () => {
+    await db.execute(
+      "INSERT INTO margin_right_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+      [documentId, lexicalJson, now],
+    );
+    await touchDocument(db, documentId);
+  });
 }
 
 export async function listPresets(db: Database): Promise<ExportPresetRecord[]> {
@@ -294,21 +309,27 @@ export async function listPresets(db: Database): Promise<ExportPresetRecord[]> {
 }
 
 export async function upsertPreset(db: Database, preset: ExportPresetRecord): Promise<void> {
-  await db.execute(
-    "INSERT INTO export_presets(id, name, built_in, preset_json, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT(id) DO UPDATE SET name = excluded.name, preset_json = excluded.preset_json, updated_at = excluded.updated_at",
-    [preset.id, preset.name, preset.builtIn ? 1 : 0, JSON.stringify(normalizePreset(preset)), Date.now()],
-  );
+  await runSerializedWrite(db, async () => {
+    await db.execute(
+      "INSERT INTO export_presets(id, name, built_in, preset_json, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT(id) DO UPDATE SET name = excluded.name, preset_json = excluded.preset_json, updated_at = excluded.updated_at",
+      [preset.id, preset.name, preset.builtIn ? 1 : 0, JSON.stringify(normalizePreset(preset)), Date.now()],
+    );
+  });
 }
 
 export async function deletePreset(db: Database, presetId: string): Promise<void> {
-  await db.execute("DELETE FROM export_presets WHERE id = $1 AND built_in = 0", [presetId]);
+  await runSerializedWrite(db, async () => {
+    await db.execute("DELETE FROM export_presets WHERE id = $1 AND built_in = 0", [presetId]);
+  });
 }
 
 export async function setDocumentDefaultPreset(db: Database, documentId: string, presetId: string): Promise<void> {
-  await db.execute(
-    "INSERT INTO document_export_settings(document_id, default_preset_id, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET default_preset_id = excluded.default_preset_id, updated_at = excluded.updated_at",
-    [documentId, presetId, Date.now()],
-  );
+  await runSerializedWrite(db, async () => {
+    await db.execute(
+      "INSERT INTO document_export_settings(document_id, default_preset_id, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET default_preset_id = excluded.default_preset_id, updated_at = excluded.updated_at",
+      [documentId, presetId, Date.now()],
+    );
+  });
 }
 
 export async function seedInitialData(db: Database): Promise<{ defaultDocumentId: string }> {

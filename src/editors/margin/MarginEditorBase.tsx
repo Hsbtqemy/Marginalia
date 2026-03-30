@@ -4,6 +4,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
   type MutableRefObject,
 } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
@@ -14,6 +15,13 @@ import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
+import { $setBlocksType } from "@lexical/selection";
+import {
+  HeadingNode,
+  QuoteNode,
+  $createHeadingNode,
+  $createQuoteNode,
+} from "@lexical/rich-text";
 import {
   INSERT_CHECK_LIST_COMMAND,
   INSERT_ORDERED_LIST_COMMAND,
@@ -23,18 +31,28 @@ import {
   REMOVE_LIST_COMMAND,
 } from "@lexical/list";
 import {
+  $createParagraphNode,
+  $getSelection,
+  $isRangeSelection,
   COMMAND_PRIORITY_LOW,
   FORMAT_TEXT_COMMAND,
+  KEY_DOWN_COMMAND,
   SELECTION_CHANGE_COMMAND,
+  type LexicalNode,
   type LexicalEditor,
 } from "lexical";
 import { mergeRegister } from "@lexical/utils";
 import { debounce } from "../../utils/debounce";
 import { useAppStore } from "../../state/useAppStore";
 import {
+  DELETE_CURRENT_MARGINALIA_BLOCK_COMMAND,
+  DUPLICATE_CURRENT_MARGINALIA_BLOCK_COMMAND,
   LINK_CURRENT_MARGINALIA_BLOCK_COMMAND,
+  MERGE_CURRENT_MARGINALIA_BLOCK_WITH_NEXT_COMMAND,
+  MERGE_CURRENT_MARGINALIA_BLOCK_WITH_PREVIOUS_COMMAND,
   MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND,
   MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND,
+  SPLIT_CURRENT_MARGINALIA_BLOCK_COMMAND,
   INSERT_MARGINALIA_BLOCK_COMMAND,
   UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND,
   $ensureFirstMarginaliaBlock,
@@ -54,6 +72,7 @@ const MARGIN_THEME = {
   text: {
     bold: "",
     italic: "",
+    underline: "",
   },
 };
 
@@ -67,6 +86,11 @@ export interface MarginEditorHandle {
   unlinkCurrent: () => void;
   moveCurrentUp: () => void;
   moveCurrentDown: () => void;
+  duplicateCurrent: () => void;
+  splitCurrent: () => void;
+  mergeCurrentUp: () => void;
+  mergeCurrentDown: () => void;
+  deleteCurrent: () => void;
   goToLinkedManuscript: () => void;
 }
 
@@ -74,10 +98,21 @@ interface MarginEditorBaseProps {
   kind: MarginKind;
   title: string;
   initialStateJson: string;
+  manuscriptExcerptByBlockId: Record<string, string>;
   onAutosave: (lexicalJson: string) => void;
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
+}
+
+type MarginBlockType = "paragraph" | "h1" | "h2" | "h3" | "quote" | "bullets" | "numbers" | "checklist";
+
+interface MarginToolbarState {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  blockType: MarginBlockType;
+  linkedManuscriptBlockId: string | null;
 }
 
 type DropPosition = "before" | "after";
@@ -104,6 +139,91 @@ interface DragState {
 
 const MARGIN_BLOCK_SELECTOR = "[data-margin-block-id]";
 const MARGINALIA_HANDLE_SELECTOR = '[data-marginalia-handle="true"]';
+const DEFAULT_MARGIN_TOOLBAR_STATE: MarginToolbarState = {
+  bold: false,
+  italic: false,
+  underline: false,
+  blockType: "paragraph",
+  linkedManuscriptBlockId: null,
+};
+
+function getMarginContentElement(node: LexicalNode | null): LexicalNode | null {
+  let current = node;
+  while (current != null) {
+    const parent = current.getParent();
+    if ($isMarginaliaBlockNode(parent)) {
+      return current;
+    }
+    current = parent;
+  }
+  return null;
+}
+
+function readMarginToolbarState(): MarginToolbarState {
+  const selection = $getSelection();
+  const currentBlock = $getCurrentMarginaliaBlockNode();
+  const nextState: MarginToolbarState = {
+    ...DEFAULT_MARGIN_TOOLBAR_STATE,
+    linkedManuscriptBlockId: currentBlock?.getLinkedManuscriptBlockId() ?? null,
+  };
+
+  if (!$isRangeSelection(selection)) {
+    return nextState;
+  }
+
+  nextState.bold = selection.hasFormat("bold");
+  nextState.italic = selection.hasFormat("italic");
+  nextState.underline = selection.hasFormat("underline");
+
+  const contentElement = getMarginContentElement(selection.anchor.getNode());
+  if (contentElement instanceof HeadingNode) {
+    const tag = contentElement.getTag();
+    nextState.blockType = tag === "h1" || tag === "h2" || tag === "h3" ? tag : "paragraph";
+    return nextState;
+  }
+  if (contentElement instanceof QuoteNode) {
+    nextState.blockType = "quote";
+    return nextState;
+  }
+  if (contentElement instanceof ListItemNode) {
+    const list = contentElement.getParent();
+    if (list instanceof ListNode) {
+      const listType = list.getListType();
+      nextState.blockType =
+        listType === "number" ? "numbers" : listType === "check" ? "checklist" : "bullets";
+    }
+  }
+
+  return nextState;
+}
+
+function syncLinkedPreviews(
+  rootElement: HTMLElement | null,
+  manuscriptExcerptByBlockId: Record<string, string>,
+): void {
+  if (!rootElement) {
+    return;
+  }
+
+  const blocks = rootElement.querySelectorAll<HTMLElement>("[data-lexical-marginalia-block='true']");
+  for (const block of blocks) {
+    const preview = block.querySelector<HTMLElement>("[data-marginalia-preview='true']");
+    if (!preview) {
+      continue;
+    }
+
+    const linkedManuscriptBlockId = block.dataset.linkedManuscriptBlockId;
+    if (!linkedManuscriptBlockId) {
+      preview.hidden = true;
+      preview.textContent = "";
+      continue;
+    }
+
+    preview.hidden = false;
+    preview.textContent =
+      manuscriptExcerptByBlockId[linkedManuscriptBlockId] ?? "Linked passage unavailable in the manuscript.";
+  }
+}
 
 function getMarginBlockElements(rootElement: HTMLElement): HTMLElement[] {
   return [...rootElement.querySelectorAll<HTMLElement>(MARGIN_BLOCK_SELECTOR)];
@@ -186,6 +306,10 @@ function MarginBridgePlugin(props: {
   editorRef: MutableRefObject<LexicalEditor | null>;
   onCurrentBlockIdChange: (blockId: string | null) => void;
   onBlurSave: () => void;
+  currentManuscriptBlockId: string | null;
+  manuscriptExcerptByBlockId: Record<string, string>;
+  onGoToLinkedManuscript: () => void;
+  onToolbarStateChange: (state: MarginToolbarState) => void;
 }): null {
   const [editor] = useLexicalComposerContext();
 
@@ -199,6 +323,15 @@ function MarginBridgePlugin(props: {
   useEffect(() => registerMarginaliaCommands(editor, props.kind), [editor, props.kind]);
 
   useEffect(() => {
+    const syncToolbarState = () => {
+      editor.getEditorState().read(() => {
+        props.onToolbarStateChange(readMarginToolbarState());
+      });
+      syncLinkedPreviews(editor.getRootElement(), props.manuscriptExcerptByBlockId);
+    };
+
+    syncToolbarState();
+
     return mergeRegister(
       editor.registerCommand(
         SELECTION_CHANGE_COMMAND,
@@ -206,11 +339,89 @@ function MarginBridgePlugin(props: {
           editor.getEditorState().read(() => {
             const block = $getCurrentMarginaliaBlockNode();
             props.onCurrentBlockIdChange(block?.getMarginBlockId() ?? null);
+            props.onToolbarStateChange(readMarginToolbarState());
           });
           return false;
         },
         COMMAND_PRIORITY_LOW,
       ),
+      editor.registerCommand(
+        KEY_DOWN_COMMAND,
+        (event) => {
+          const isMainModifier = event.metaKey || event.ctrlKey;
+          if (!isMainModifier || !event.altKey) {
+            return false;
+          }
+
+          const key = event.key.toLowerCase();
+          if (key === "n") {
+            event.preventDefault();
+            editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
+              kind: props.kind,
+              linkedManuscriptBlockId: props.currentManuscriptBlockId,
+            });
+            return true;
+          }
+          if (key === "l" && props.currentManuscriptBlockId) {
+            event.preventDefault();
+            editor.dispatchCommand(LINK_CURRENT_MARGINALIA_BLOCK_COMMAND, {
+              manuscriptBlockId: props.currentManuscriptBlockId,
+            });
+            return true;
+          }
+          if (key === "u") {
+            event.preventDefault();
+            editor.dispatchCommand(UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
+            return true;
+          }
+          if (key === "g") {
+            event.preventDefault();
+            props.onGoToLinkedManuscript();
+            return true;
+          }
+          if (key === "d") {
+            event.preventDefault();
+            editor.dispatchCommand(DUPLICATE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
+            return true;
+          }
+          if (key === "s") {
+            event.preventDefault();
+            editor.dispatchCommand(SPLIT_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
+            return true;
+          }
+          if (key === "x") {
+            event.preventDefault();
+            editor.dispatchCommand(DELETE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
+            return true;
+          }
+          if (event.shiftKey && event.key === "ArrowUp") {
+            event.preventDefault();
+            editor.dispatchCommand(MERGE_CURRENT_MARGINALIA_BLOCK_WITH_PREVIOUS_COMMAND, undefined);
+            return true;
+          }
+          if (event.shiftKey && event.key === "ArrowDown") {
+            event.preventDefault();
+            editor.dispatchCommand(MERGE_CURRENT_MARGINALIA_BLOCK_WITH_NEXT_COMMAND, undefined);
+            return true;
+          }
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND, undefined);
+            return true;
+          }
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND, undefined);
+            return true;
+          }
+
+          return false;
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
+      editor.registerUpdateListener(() => {
+        syncToolbarState();
+      }),
       editor.registerRootListener((rootElement, prevRootElement) => {
         const onBlur = () => props.onBlurSave();
         if (prevRootElement) {
@@ -563,10 +774,11 @@ function MarginDragAndDropPlugin(): null {
 function MarginToolbar(props: {
   editorRef: MutableRefObject<LexicalEditor | null>;
   kind: MarginKind;
+  currentManuscriptBlockId: string | null;
+  toolbarState: MarginToolbarState;
+  onInsertLinkedBlock: () => void;
   onGoToLinkedManuscript: () => void;
 }) {
-  const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
-
   const run = (callback: (editor: LexicalEditor) => void) => {
     const editor = props.editorRef.current;
     if (!editor) {
@@ -575,80 +787,250 @@ function MarginToolbar(props: {
     callback(editor);
   };
 
+  const setBlockType = (type: "paragraph" | "h1" | "h2" | "h3" | "quote") => {
+    run((editor) => {
+      editor.update(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection)) {
+          return;
+        }
+
+        if (type === "paragraph") {
+          $setBlocksType(selection, () => $createParagraphNode());
+          return;
+        }
+
+        if (type === "quote") {
+          $setBlocksType(selection, () => $createQuoteNode());
+          return;
+        }
+
+        $setBlocksType(selection, () => $createHeadingNode(type));
+      });
+    });
+  };
+
   return (
-    <div className="editor-toolbar">
-      <span className="editor-toolbar-label">Formatting</span>
-      <button className="toolbar-button" type="button" onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold"))}>
-        Bold
-      </button>
-      <button className="toolbar-button" type="button" onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic"))}>
-        Italic
-      </button>
-      <button
-        className="toolbar-button"
-        type="button"
-        onClick={() => run((editor) => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined))}
-      >
-        Bullets
-      </button>
-      <button
-        className="toolbar-button"
-        type="button"
-        onClick={() => run((editor) => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined))}
-      >
-        Numbers
-      </button>
-      <button
-        className="toolbar-button"
-        type="button"
-        onClick={() => run((editor) => editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined))}
-      >
-        Checklist
-      </button>
-      <button className="toolbar-button" type="button" onClick={() => run((editor) => editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined))}>
-        No List
-      </button>
-      <button
-        className="toolbar-button"
-        type="button"
-        onClick={() =>
-          run((editor) =>
-            editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
-              kind: props.kind,
-              linkedManuscriptBlockId: null,
-            }),
-          )
-        }
-      >
-        + Block
-      </button>
-      <button
-        className="toolbar-button"
-        type="button"
-        onClick={() =>
-          run((editor) =>
-            editor.dispatchCommand(LINK_CURRENT_MARGINALIA_BLOCK_COMMAND, {
-              manuscriptBlockId: currentManuscriptBlockId,
-            }),
-          )
-        }
-        disabled={!currentManuscriptBlockId}
-      >
-        Link Current
-      </button>
-      <button className="toolbar-button" type="button" onClick={() => run((editor) => editor.dispatchCommand(UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}>
-        Unlink
-      </button>
-      <button className="toolbar-button" type="button" onClick={props.onGoToLinkedManuscript}>
-        Go Linked
-      </button>
-      <button className="toolbar-button" type="button" onClick={() => run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND, undefined))}>
-        Move Up
-      </button>
-      <button className="toolbar-button" type="button" onClick={() => run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND, undefined))}>
-        Move Down
-      </button>
-    </div>
+    <>
+      <div className="editor-toolbar">
+        <span className="editor-toolbar-label">Notes</span>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.bold ? "true" : "false"}
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold"))}
+        >
+          Bold
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.italic ? "true" : "false"}
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic"))}
+        >
+          Italic
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.underline ? "true" : "false"}
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline"))}
+        >
+          Underline
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "paragraph" ? "true" : "false"}
+          type="button"
+          onClick={() => setBlockType("paragraph")}
+        >
+          Text
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "h1" ? "true" : "false"}
+          type="button"
+          onClick={() => setBlockType("h1")}
+        >
+          H1
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "h2" ? "true" : "false"}
+          type="button"
+          onClick={() => setBlockType("h2")}
+        >
+          H2
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "h3" ? "true" : "false"}
+          type="button"
+          onClick={() => setBlockType("h3")}
+        >
+          H3
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "quote" ? "true" : "false"}
+          type="button"
+          onClick={() => setBlockType("quote")}
+        >
+          Quote
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "bullets" ? "true" : "false"}
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined))}
+        >
+          Bullets
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "numbers" ? "true" : "false"}
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined))}
+        >
+          Numbers
+        </button>
+        <button
+          className="toolbar-button"
+          data-active={props.toolbarState.blockType === "checklist" ? "true" : "false"}
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined))}
+        >
+          Checklist
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined))}
+        >
+          No List
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() =>
+            run((editor) =>
+              editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
+                kind: props.kind,
+                linkedManuscriptBlockId: null,
+              }),
+            )
+          }
+        >
+          New Note
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={props.onInsertLinkedBlock}
+          disabled={!props.currentManuscriptBlockId}
+        >
+          New Linked Note
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() =>
+            run((editor) =>
+              editor.dispatchCommand(LINK_CURRENT_MARGINALIA_BLOCK_COMMAND, {
+                manuscriptBlockId: props.currentManuscriptBlockId,
+              }),
+            )
+          }
+          disabled={!props.currentManuscriptBlockId}
+        >
+          Link to Passage
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}
+        >
+          Remove Link
+        </button>
+        <button className="toolbar-button" type="button" onClick={props.onGoToLinkedManuscript}>
+          Go to Passage
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(SPLIT_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}
+        >
+          Split
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(MERGE_CURRENT_MARGINALIA_BLOCK_WITH_PREVIOUS_COMMAND, undefined))}
+        >
+          Merge with Above
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(MERGE_CURRENT_MARGINALIA_BLOCK_WITH_NEXT_COMMAND, undefined))}
+        >
+          Merge with Below
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(DUPLICATE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}
+        >
+          Duplicate Note
+        </button>
+        <button
+          className="toolbar-button destructive-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(DELETE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}
+        >
+          Delete Note
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND, undefined))}
+        >
+          Move Earlier
+        </button>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={() => run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND, undefined))}
+        >
+          Move Later
+        </button>
+      </div>
+      <div className="margin-writing-status">
+        <span
+          className={`margin-status-chip ${
+            props.toolbarState.linkedManuscriptBlockId ? "is-linked" : "is-unlinked"
+          }`}
+        >
+          {props.toolbarState.linkedManuscriptBlockId ? "Linked note" : "Free note"}
+        </span>
+        <span className="margin-status-copy">
+          {props.toolbarState.linkedManuscriptBlockId
+            ? `Linked to passage ${props.toolbarState.linkedManuscriptBlockId.slice(0, 8)}`
+            : "Link this note to the current passage when you want it anchored to the text."}
+        </span>
+        <span className={`margin-status-chip ${props.currentManuscriptBlockId ? "is-targeting" : ""}`}>
+          {props.currentManuscriptBlockId ? "Passage ready" : "Select a passage to link"}
+        </span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked note</span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+L link current note</span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G jump to passage</span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+D duplicate note</span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+S split note</span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Shift+Up merge upward</span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Shift+Down merge downward</span>
+        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+X delete note</span>
+      </div>
+    </>
   );
 }
 
@@ -658,6 +1040,8 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
 ) {
   const editorRef = useRef<LexicalEditor | null>(null);
   const revealTimeoutRef = useRef<number | null>(null);
+  const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
+  const [toolbarState, setToolbarState] = useState<MarginToolbarState>(DEFAULT_MARGIN_TOOLBAR_STATE);
 
   const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props]);
   const linkIndexSave = useMemo(
@@ -677,6 +1061,10 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
       }
     };
   }, [autosave, linkIndexSave]);
+
+  useEffect(() => {
+    syncLinkedPreviews(editorRef.current?.getRootElement() ?? null, props.manuscriptExcerptByBlockId);
+  }, [props.manuscriptExcerptByBlockId]);
 
   const insertBlock = (linkedManuscriptBlockId: string | null) => {
     const editor = editorRef.current;
@@ -786,6 +1174,21 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
       moveCurrentDown: () => {
         editorRef.current?.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND, undefined);
       },
+      duplicateCurrent: () => {
+        editorRef.current?.dispatchCommand(DUPLICATE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
+      },
+      splitCurrent: () => {
+        editorRef.current?.dispatchCommand(SPLIT_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
+      },
+      mergeCurrentUp: () => {
+        editorRef.current?.dispatchCommand(MERGE_CURRENT_MARGINALIA_BLOCK_WITH_PREVIOUS_COMMAND, undefined);
+      },
+      mergeCurrentDown: () => {
+        editorRef.current?.dispatchCommand(MERGE_CURRENT_MARGINALIA_BLOCK_WITH_NEXT_COMMAND, undefined);
+      },
+      deleteCurrent: () => {
+        editorRef.current?.dispatchCommand(DELETE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
+      },
       goToLinkedManuscript,
     }),
     [props.initialStateJson, props.kind],
@@ -798,7 +1201,7 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
       onError(error: Error) {
         throw error;
       },
-      nodes: [MarginaliaBlockNode, ListNode, ListItemNode],
+      nodes: [MarginaliaBlockNode, HeadingNode, QuoteNode, ListNode, ListItemNode],
       editorState: props.initialStateJson,
     }),
     [props.initialStateJson, props.kind],
@@ -816,13 +1219,16 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
         <MarginToolbar
           editorRef={editorRef}
           kind={props.kind}
+          currentManuscriptBlockId={currentManuscriptBlockId}
+          toolbarState={toolbarState}
+          onInsertLinkedBlock={() => insertBlock(currentManuscriptBlockId)}
           onGoToLinkedManuscript={goToLinkedManuscript}
         />
         <div className="lexical-scroll">
           <div className="editor-content-wrap">
             <RichTextPlugin
               contentEditable={<ContentEditable className="lexical-editor" aria-label={`${props.title} editor`} />}
-              placeholder={<div className="lexical-placeholder">Write continuously…</div>}
+              placeholder={<div className="lexical-placeholder">Write in the margin...</div>}
               ErrorBoundary={LexicalErrorBoundary}
             />
           </div>
@@ -842,6 +1248,10 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           kind={props.kind}
           editorRef={editorRef}
           onCurrentBlockIdChange={props.onCurrentBlockIdChange}
+          currentManuscriptBlockId={currentManuscriptBlockId}
+          manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
+          onGoToLinkedManuscript={goToLinkedManuscript}
+          onToolbarStateChange={setToolbarState}
           onBlurSave={() => {
             const editor = editorRef.current;
             if (!editor) {
