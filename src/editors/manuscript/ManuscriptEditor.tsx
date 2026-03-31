@@ -416,20 +416,11 @@ function ManuscriptToolbar(props: {
           </div>
         </details>
       </div>
-      <div className="margin-writing-status">
-        <div className="editor-context-group">
-          <span className={`margin-status-chip ${currentManuscriptBlockId ? "is-targeting" : ""}`}>
-            {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select a passage"}
-          </span>
-          <span className="editor-context-copy">
-            {currentManuscriptBlockId
-              ? "Anchor notes to the current passage."
-              : "Move into a paragraph, heading, quote, or list item to target notes."}
-          </span>
-        </div>
-        <div className="editor-context-group">
-          <span className="margin-status-chip">Notes: L{linkedLeftCount} R{linkedRightCount}</span>
-        </div>
+      <div className="margin-writing-status manuscript-context-row">
+        <span className={`margin-status-chip ${currentManuscriptBlockId ? "is-targeting" : ""}`}>
+          {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select a passage"}
+        </span>
+        <span className="margin-status-chip">Notes: L{linkedLeftCount} R{linkedRightCount}</span>
         <details className="context-help">
           <summary>Writing help</summary>
           <div className="context-help-body">

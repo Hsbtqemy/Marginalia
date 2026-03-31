@@ -57,6 +57,7 @@ import {
   INSERT_MARGINALIA_BLOCK_COMMAND,
   UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND,
   $ensureFirstMarginaliaBlock,
+  $normalizeMarginaliaRoot,
   $findMarginaliaBlockById,
   $getCurrentMarginaliaBlockNode,
   registerMarginaliaCommands,
@@ -310,6 +311,7 @@ function EnsureInitialBlockPlugin(props: { kind: MarginKind }): null {
 
   useEffect(() => {
     editor.update(() => {
+      $normalizeMarginaliaRoot(props.kind);
       $ensureFirstMarginaliaBlock(props.kind);
     });
   }, [editor, props.kind]);

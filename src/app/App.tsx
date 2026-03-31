@@ -253,7 +253,7 @@ export default function App() {
             highContrast: false,
             pagePreview: false,
             rightPaneVisible: false,
-            paneSizes: { left: 0.3, right: 0.24 },
+            paneSizes: { left: 0.24, right: 0.2 },
           },
         });
         if (!active) {
@@ -265,7 +265,7 @@ export default function App() {
         const storedHighContrast = (await loadedPrefs.get<boolean>("highContrast")) ?? false;
         const storedPagePreview = (await loadedPrefs.get<boolean>("pagePreview")) ?? false;
         const storedRightPaneVisible = (await loadedPrefs.get<boolean>("rightPaneVisible")) ?? false;
-        const storedPaneSizes = (await loadedPrefs.get<PaneSizes>("paneSizes")) ?? { left: 0.3, right: 0.24 };
+        const storedPaneSizes = (await loadedPrefs.get<PaneSizes>("paneSizes")) ?? { left: 0.24, right: 0.2 };
 
         setThemeMode(storedThemeMode);
         setHighContrast(storedHighContrast);
@@ -960,6 +960,7 @@ export default function App() {
               </option>
             ))}
           </select>
+          <span className="app-chip">Style: {activePreset?.name ?? "No preset"}</span>
         </div>
 
         <div className="app-topbar-actions">
@@ -975,14 +976,9 @@ export default function App() {
           <button className="secondary-button" type="button" onClick={() => setCommandPaletteOpen(true)}>
             Quick Actions
           </button>
-        </div>
-
-        <div className="app-topbar-meta">
-          <span className="app-chip">Style: {activePreset?.name ?? "No preset"}</span>
           <span className="app-chip">
             Focus: {activePane === "left" ? "Marginalia" : activePane === "right" ? "Sources & Notes" : "Manuscript"}
           </span>
-          <span className="app-chip">Quick Actions: Ctrl/Cmd+K</span>
         </div>
       </header>
 

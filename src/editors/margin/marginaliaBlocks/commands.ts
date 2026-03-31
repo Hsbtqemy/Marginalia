@@ -146,6 +146,51 @@ export function $ensureFirstMarginaliaBlock(kind: MarginKind): MarginaliaBlockNo
   return block;
 }
 
+export function $normalizeMarginaliaRoot(kind: MarginKind): void {
+  const root = $getRoot();
+  const rootChildren = [...root.getChildren()];
+
+  if (rootChildren.length === 0) {
+    root.append(createBlock({ kind }));
+    return;
+  }
+
+  const hasNonMarginaliaChildren = rootChildren.some((child) => !$isMarginaliaBlockNode(child));
+  if (!hasNonMarginaliaChildren) {
+    return;
+  }
+
+  let fallbackBlock =
+    rootChildren.find((child): child is MarginaliaBlockNode => $isMarginaliaBlockNode(child)) ?? null;
+
+  if (!fallbackBlock) {
+    fallbackBlock = createBlock({ kind });
+    const firstChild = root.getFirstChild();
+    if (firstChild) {
+      firstChild.insertBefore(fallbackBlock);
+    } else {
+      root.append(fallbackBlock);
+    }
+  }
+
+  for (const child of [...root.getChildren()]) {
+    if ($isMarginaliaBlockNode(child)) {
+      continue;
+    }
+
+    if ($isElementNode(child)) {
+      fallbackBlock.append(child);
+      continue;
+    }
+
+    const paragraph = $createParagraphNode();
+    paragraph.append(child);
+    fallbackBlock.append(paragraph);
+  }
+
+  ensureBlockHasContent(fallbackBlock);
+}
+
 export function $insertMarginaliaBlock(payload: InsertMarginaliaBlockPayload): MarginaliaBlockNode {
   const current = $getCurrentMarginaliaBlockNode();
   const root = $getRoot();

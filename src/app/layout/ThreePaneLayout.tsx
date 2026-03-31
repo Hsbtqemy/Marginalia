@@ -17,10 +17,10 @@ interface ThreePaneLayoutProps {
   onPaneSizesChange: (sizes: PaneSizes) => void;
 }
 
-const MIN_LEFT_RATIO = 0.18;
-const MAX_LEFT_RATIO = 0.42;
-const MIN_RIGHT_RATIO = 0.16;
-const MAX_RIGHT_RATIO = 0.36;
+const MIN_LEFT_RATIO = 0.15;
+const MAX_LEFT_RATIO = 0.26;
+const MIN_RIGHT_RATIO = 0.14;
+const MAX_RIGHT_RATIO = 0.24;
 // Safety fallback: pointer-capture based resize can lock input on some Windows/WebView setups.
 // Keep keyboard resize active, but disable pointer resize until a fully stable implementation lands.
 const ENABLE_POINTER_RESIZE = false;
@@ -145,9 +145,12 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
     });
   };
 
+  const leftWidth = clamp(props.paneSizes.left, MIN_LEFT_RATIO, MAX_LEFT_RATIO);
+  const rightWidth = clamp(props.paneSizes.right, MIN_RIGHT_RATIO, MAX_RIGHT_RATIO);
+
   const style = {
-    ["--left-width" as string]: `${props.paneSizes.left * 100}%`,
-    ["--right-width" as string]: `${props.paneSizes.right * 100}%`,
+    ["--left-width" as string]: `${leftWidth * 100}%`,
+    ["--right-width" as string]: `${rightWidth * 100}%`,
   } as CSSProperties;
 
   return (

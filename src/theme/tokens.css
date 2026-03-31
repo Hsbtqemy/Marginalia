@@ -137,34 +137,30 @@ textarea:focus-visible,
 }
 
 .app-topbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap-sm);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px var(--gap-md);
   align-items: center;
   border-bottom: 1px solid var(--border);
-  padding: 14px 18px;
+  padding: 10px 16px;
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   backdrop-filter: blur(10px);
 }
 
 .app-topbar-document {
-  min-width: 320px;
-  flex: 1 1 480px;
-  display: flex;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(260px, 1fr) auto;
   align-items: center;
   gap: var(--gap-md);
 }
 
-.app-topbar-actions,
-.app-topbar-meta {
+.app-topbar-actions {
   display: inline-flex;
   align-items: center;
-  gap: var(--gap-sm);
-  flex-wrap: wrap;
-}
-
-.app-topbar-meta {
+  justify-self: end;
   gap: 6px;
+  flex-wrap: nowrap;
 }
 
 .status-banner {
@@ -180,14 +176,13 @@ textarea:focus-visible,
 
 .app-topbar-title {
   font-family: var(--font-editor);
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
 
 .app-document-select {
-  min-width: 360px;
-  flex: 1 1 420px;
+  min-width: 0;
 }
 
 .app-chip {
@@ -196,10 +191,10 @@ textarea:focus-visible,
   gap: var(--gap-xs);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 2px 10px;
+  padding: 1px 9px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .app-icon-button,
@@ -213,7 +208,7 @@ textarea:focus-visible,
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--fg);
-  padding: 4px 10px;
+  padding: 5px 10px;
   cursor: pointer;
 }
 
@@ -251,22 +246,26 @@ textarea:focus-visible,
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(var(--pane-min), var(--left-width)) 6px minmax(320px, 1fr) 6px minmax(var(--pane-min), var(--right-width));
+  grid-template-columns: minmax(var(--pane-min), var(--left-width)) 4px minmax(420px, 1fr) 4px minmax(var(--pane-min), var(--right-width));
   overflow: hidden;
-  --left-width: 30%;
-  --right-width: 24%;
+  --left-width: 24%;
+  --right-width: 20%;
 }
 
 .three-pane-root[data-right-hidden="true"] {
-  grid-template-columns: minmax(var(--pane-min), var(--left-width)) 6px minmax(360px, 1fr) 0 minmax(0, 0);
+  grid-template-columns: minmax(var(--pane-min), var(--left-width)) 4px minmax(560px, 1fr) 0 minmax(0, 0);
 }
 
 .pane {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
   transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.pane-center {
+  background: color-mix(in srgb, var(--surface) 98%, var(--bg));
 }
 
 .pane + .pane {
@@ -274,12 +273,12 @@ textarea:focus-visible,
 }
 
 .pane[data-active="true"] {
-  background: color-mix(in srgb, var(--surface) 98%, var(--bg));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, var(--bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .resizer {
-  background: var(--bg);
+  background: color-mix(in srgb, var(--surface-raised) 40%, var(--bg));
   border-left: 1px solid var(--separator);
   border-right: 1px solid var(--separator);
   cursor: col-resize;
@@ -292,8 +291,9 @@ textarea:focus-visible,
 .editor-shell {
   width: 100%;
   height: 100%;
-  display: grid;
-  grid-template-rows: auto 1fr;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: transparent;
 }
 
@@ -302,8 +302,8 @@ textarea:focus-visible,
   flex-wrap: wrap;
   gap: var(--gap-xs);
   border-bottom: 1px solid var(--border);
-  padding: 10px 14px 10px;
-  background: color-mix(in srgb, var(--surface-raised) 86%, transparent);
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
 }
 
 .editor-toolbar-label {
@@ -315,7 +315,7 @@ textarea:focus-visible,
 }
 
 .editor-toolbar-manuscript {
-  padding-inline: 18px;
+  padding-inline: 14px;
 }
 
 .toolbar-inline-group {
@@ -330,8 +330,7 @@ textarea:focus-visible,
 }
 
 .toolbar-button-prominent {
-  background: color-mix(in srgb, var(--surface) 96%, #fffaf2);
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--shadow) 24%, transparent);
+  background: color-mix(in srgb, var(--surface) 97%, #fffaf2);
 }
 
 .toolbar-button-compact {
@@ -339,7 +338,7 @@ textarea:focus-visible,
 }
 
 .editor-toolbar-margin {
-  gap: 8px;
+  gap: 6px;
 }
 
 .editor-toolbar-margin .editor-toolbar-label {
@@ -352,20 +351,20 @@ textarea:focus-visible,
   align-items: center;
   align-content: flex-start;
   gap: var(--gap-xs);
-  padding: 8px 14px 10px;
+  padding: 6px 12px 8px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-raised) 84%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
 }
 
 .editor-context-group {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 30px;
-  padding: 3px;
+  min-height: 28px;
+  padding: 2px;
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
 }
 
 .editor-context-copy {
@@ -382,11 +381,11 @@ textarea:focus-visible,
   align-items: center;
   align-self: center;
   flex: 0 0 auto;
-  min-height: 28px;
-  padding: 0 10px;
+  min-height: 26px;
+  padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
@@ -406,7 +405,8 @@ textarea:focus-visible,
 
 .lexical-scroll {
   overflow: auto;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 20px;
 }
 
@@ -502,22 +502,18 @@ textarea:focus-visible,
 }
 
 .manuscript-scroll {
-  padding: 8px 24px 28px;
+  padding: 4px 18px 22px;
 }
 
 .manuscript-page {
-  max-width: 920px;
+  max-width: 960px;
   margin: 0 auto;
   min-height: 100%;
-  padding: 28px 68px 72px;
+  padding: 24px 62px 66px;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 95%, #fff4e7), color-mix(in srgb, var(--surface) 98%, transparent) 22%, var(--surface)),
-    color-mix(in srgb, var(--surface) 94%, var(--surface-raised));
-  box-shadow:
-    0 26px 60px color-mix(in srgb, var(--shadow) 75%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 78%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 97%, #fff9f1);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--shadow) 40%, transparent);
 }
 
 .page-preview .lexical-editor {
@@ -535,7 +531,7 @@ textarea:focus-visible,
   justify-content: space-between;
   align-items: center;
   gap: var(--gap-sm);
-  padding: 12px 14px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
 }
@@ -560,14 +556,14 @@ textarea:focus-visible,
 }
 
 .margin-create-button {
-  min-width: 40px;
-  min-height: 36px;
-  font-size: 22px;
+  min-width: 36px;
+  min-height: 32px;
+  font-size: 20px;
   line-height: 1;
 }
 
 .margin-scroll {
-  padding: 12px 14px 18px;
+  padding: 10px 12px 14px;
 }
 
 .margin-editor-content {
@@ -576,8 +572,8 @@ textarea:focus-visible,
 
 .editor-shell-margin .lexical-editor {
   min-height: 0;
-  font-size: 17px;
-  line-height: 1.68;
+  font-size: 16px;
+  line-height: 1.62;
 }
 
 .margin-placeholder {
@@ -586,18 +582,13 @@ textarea:focus-visible,
 
 .marginalia-block {
   position: relative;
-  border-top: 1px solid color-mix(in srgb, var(--separator) 62%, transparent);
-  padding-top: 12px;
-  margin-top: 12px;
-  padding-inline: 12px;
-  padding-bottom: 12px;
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff5eb), color-mix(in srgb, var(--surface) 96%, transparent)),
-    color-mix(in srgb, var(--surface) 88%, var(--surface-raised));
-  box-shadow:
-    0 12px 24px color-mix(in srgb, var(--shadow) 34%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--separator) 62%, transparent);
+  padding-top: 10px;
+  margin-top: 10px;
+  padding-inline: 10px;
+  padding-bottom: 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
 }
 
 .marginalia-block-header {
@@ -645,19 +636,17 @@ textarea:focus-visible,
 
 .marginalia-block-preview {
   margin: 0 0 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-left: 3px solid color-mix(in srgb, var(--accent) 35%, var(--border));
   border-radius: 0 12px 12px 0;
-  background: color-mix(in srgb, var(--surface-raised) 82%, var(--highlight-soft));
+  background: color-mix(in srgb, var(--surface-raised) 84%, var(--highlight-soft));
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .marginalia-block[data-linked="true"] {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--highlight-soft) 86%, transparent), transparent 58%),
-    color-mix(in srgb, var(--surface) 88%, var(--surface-raised));
+  background: color-mix(in srgb, var(--highlight-soft) 45%, var(--surface));
 }
 
 .marginalia-block[data-linked="true"] .marginalia-block-meta {
@@ -671,12 +660,20 @@ textarea:focus-visible,
   align-items: center;
 }
 
+.manuscript-context-row {
+  gap: 6px;
+}
+
+.manuscript-context-row .context-help {
+  margin-left: auto;
+}
+
 .context-help > summary,
 .editor-advanced-tools > summary {
   list-style: none;
   cursor: pointer;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   background: color-mix(in srgb, var(--surface) 90%, transparent);
 }
 
@@ -965,6 +962,26 @@ textarea:focus-visible,
 .empty-state {
   padding: var(--gap-md);
   color: var(--muted);
+}
+
+@media (max-width: 1280px) {
+  .app-topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .app-topbar-actions {
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+
+  .app-topbar-document {
+    grid-template-columns: auto minmax(220px, 1fr);
+  }
+
+  .app-topbar-document .app-chip {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }
 
 @media (max-width: 980px) {
