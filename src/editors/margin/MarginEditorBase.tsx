@@ -1,4 +1,5 @@
 import {
+  useCallback,
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -141,6 +142,9 @@ interface DragState {
 
 const MARGIN_BLOCK_SELECTOR = "[data-margin-block-id]";
 const MARGINALIA_HANDLE_SELECTOR = '[data-marginalia-handle="true"]';
+// Safety fallback: pointer-drag can lock all clicks if capture is not released by the runtime.
+// Keep keyboard + command based structure operations enabled.
+const ENABLE_POINTER_BLOCK_DRAG = false;
 const DEFAULT_MARGIN_TOOLBAR_STATE: MarginToolbarState = {
   bold: false,
   italic: false,
@@ -148,6 +152,16 @@ const DEFAULT_MARGIN_TOOLBAR_STATE: MarginToolbarState = {
   blockType: "paragraph",
   linkedManuscriptBlockId: null,
 };
+
+function marginToolbarStateEquals(a: MarginToolbarState, b: MarginToolbarState): boolean {
+  return (
+    a.bold === b.bold &&
+    a.italic === b.italic &&
+    a.underline === b.underline &&
+    a.blockType === b.blockType &&
+    a.linkedManuscriptBlockId === b.linkedManuscriptBlockId
+  );
+}
 
 function getMarginContentElement(node: LexicalNode | null): LexicalNode | null {
   let current = node;
@@ -315,6 +329,35 @@ function MarginBridgePlugin(props: {
   onFocusChange?: (focused: boolean) => void;
 }): null {
   const [editor] = useLexicalComposerContext();
+  const callbacksRef = useRef({
+    currentManuscriptBlockId: props.currentManuscriptBlockId,
+    manuscriptExcerptByBlockId: props.manuscriptExcerptByBlockId,
+    onCurrentBlockIdChange: props.onCurrentBlockIdChange,
+    onBlurSave: props.onBlurSave,
+    onGoToLinkedManuscript: props.onGoToLinkedManuscript,
+    onToolbarStateChange: props.onToolbarStateChange,
+    onFocusChange: props.onFocusChange,
+  });
+
+  useEffect(() => {
+    callbacksRef.current = {
+      currentManuscriptBlockId: props.currentManuscriptBlockId,
+      manuscriptExcerptByBlockId: props.manuscriptExcerptByBlockId,
+      onCurrentBlockIdChange: props.onCurrentBlockIdChange,
+      onBlurSave: props.onBlurSave,
+      onGoToLinkedManuscript: props.onGoToLinkedManuscript,
+      onToolbarStateChange: props.onToolbarStateChange,
+      onFocusChange: props.onFocusChange,
+    };
+  }, [
+    props.currentManuscriptBlockId,
+    props.manuscriptExcerptByBlockId,
+    props.onCurrentBlockIdChange,
+    props.onBlurSave,
+    props.onGoToLinkedManuscript,
+    props.onToolbarStateChange,
+    props.onFocusChange,
+  ]);
 
   useEffect(() => {
     props.editorRef.current = editor;
@@ -328,9 +371,9 @@ function MarginBridgePlugin(props: {
   useEffect(() => {
     const syncToolbarState = () => {
       editor.getEditorState().read(() => {
-        props.onToolbarStateChange(readMarginToolbarState());
+        callbacksRef.current.onToolbarStateChange(readMarginToolbarState());
       });
-      syncLinkedPreviews(editor.getRootElement(), props.manuscriptExcerptByBlockId);
+      syncLinkedPreviews(editor.getRootElement(), callbacksRef.current.manuscriptExcerptByBlockId);
     };
 
     syncToolbarState();
@@ -341,8 +384,8 @@ function MarginBridgePlugin(props: {
         () => {
           editor.getEditorState().read(() => {
             const block = $getCurrentMarginaliaBlockNode();
-            props.onCurrentBlockIdChange(block?.getMarginBlockId() ?? null);
-            props.onToolbarStateChange(readMarginToolbarState());
+            callbacksRef.current.onCurrentBlockIdChange(block?.getMarginBlockId() ?? null);
+            callbacksRef.current.onToolbarStateChange(readMarginToolbarState());
           });
           return false;
         },
@@ -361,14 +404,14 @@ function MarginBridgePlugin(props: {
             event.preventDefault();
             editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
               kind: props.kind,
-              linkedManuscriptBlockId: props.currentManuscriptBlockId,
+              linkedManuscriptBlockId: callbacksRef.current.currentManuscriptBlockId,
             });
             return true;
           }
-          if (key === "l" && props.currentManuscriptBlockId) {
+          if (key === "l" && callbacksRef.current.currentManuscriptBlockId) {
             event.preventDefault();
             editor.dispatchCommand(LINK_CURRENT_MARGINALIA_BLOCK_COMMAND, {
-              manuscriptBlockId: props.currentManuscriptBlockId,
+              manuscriptBlockId: callbacksRef.current.currentManuscriptBlockId,
             });
             return true;
           }
@@ -379,7 +422,7 @@ function MarginBridgePlugin(props: {
           }
           if (key === "g") {
             event.preventDefault();
-            props.onGoToLinkedManuscript();
+            callbacksRef.current.onGoToLinkedManuscript();
             return true;
           }
           if (key === "d") {
@@ -426,13 +469,15 @@ function MarginBridgePlugin(props: {
         syncToolbarState();
       }),
       editor.registerRootListener((rootElement, prevRootElement) => {
-        const onBlur = () => props.onBlurSave();
-        const onFocusIn = () => props.onFocusChange?.(true);
+        const onBlur = () => callbacksRef.current.onBlurSave();
+        const onFocusIn = () => callbacksRef.current.onFocusChange?.(true);
         const onFocusOut = () => {
           window.setTimeout(() => {
             const root = editor.getRootElement();
             const activeElement = document.activeElement;
-            props.onFocusChange?.(Boolean(root && activeElement instanceof Node && root.contains(activeElement)));
+            callbacksRef.current.onFocusChange?.(
+              Boolean(root && activeElement instanceof Node && root.contains(activeElement))
+            );
           }, 0);
         };
         if (prevRootElement) {
@@ -447,7 +492,7 @@ function MarginBridgePlugin(props: {
         }
       }),
     );
-  }, [editor, props]);
+  }, [editor, props.kind]);
 
   return null;
 }
@@ -601,8 +646,12 @@ function MarginDragAndDropPlugin(): null {
       window.removeEventListener("blur", onWindowBlur);
       dragState.sourceHandle.removeEventListener("lostpointercapture", onLostPointerCapture);
 
-      if (dragState.sourceHandle.hasPointerCapture(dragState.pointerId)) {
-        dragState.sourceHandle.releasePointerCapture(dragState.pointerId);
+      try {
+        if (dragState.sourceHandle.hasPointerCapture(dragState.pointerId)) {
+          dragState.sourceHandle.releasePointerCapture(dragState.pointerId);
+        }
+      } catch (error) {
+        console.warn("Failed to release pointer capture for marginalia drag", error);
       }
 
       if (
@@ -641,7 +690,13 @@ function MarginDragAndDropPlugin(): null {
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0 || pointerDragRef.current) {
+      if (event.button !== 0) {
+        return;
+      }
+      if (pointerDragRef.current) {
+        stopPointerDrag(false, null);
+      }
+      if (pointerDragRef.current) {
         return;
       }
 
@@ -1074,14 +1129,30 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
   const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
   const [toolbarState, setToolbarState] = useState<MarginToolbarState>(DEFAULT_MARGIN_TOOLBAR_STATE);
 
-  const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props]);
+  const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props.onAutosave]);
   const linkIndexSave = useMemo(
     () =>
       debounce((json: string) => {
         props.onLinkIndexChange(buildMarginLinkIndexFromLexicalJson(json));
       }, 350),
-    [props],
+    [props.onLinkIndexChange],
   );
+  const handleToolbarStateChange = useCallback((nextState: MarginToolbarState) => {
+    setToolbarState((previousState) =>
+      marginToolbarStateEquals(previousState, nextState) ? previousState : nextState
+    );
+  }, []);
+  const handleBlurSave = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+    autosave.cancel();
+    linkIndexSave.cancel();
+    const json = JSON.stringify(editor.getEditorState().toJSON());
+    props.onAutosave(json);
+    props.onLinkIndexChange(buildMarginLinkIndexFromLexicalJson(json));
+  }, [autosave, linkIndexSave, props.onAutosave, props.onLinkIndexChange]);
 
   useEffect(() => {
     return () => {
@@ -1285,21 +1356,11 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           currentManuscriptBlockId={currentManuscriptBlockId}
           manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
           onGoToLinkedManuscript={goToLinkedManuscript}
-          onToolbarStateChange={setToolbarState}
+          onToolbarStateChange={handleToolbarStateChange}
           onFocusChange={props.onFocusChange}
-          onBlurSave={() => {
-            const editor = editorRef.current;
-            if (!editor) {
-              return;
-            }
-            autosave.cancel();
-            linkIndexSave.cancel();
-            const json = JSON.stringify(editor.getEditorState().toJSON());
-            props.onAutosave(json);
-            props.onLinkIndexChange(buildMarginLinkIndexFromLexicalJson(json));
-          }}
+          onBlurSave={handleBlurSave}
         />
-        <MarginDragAndDropPlugin />
+        {ENABLE_POINTER_BLOCK_DRAG ? <MarginDragAndDropPlugin /> : null}
       </LexicalComposer>
     </div>
   );

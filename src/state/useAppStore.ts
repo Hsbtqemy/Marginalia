@@ -15,6 +15,33 @@ export interface MarginLinkIndex {
   [manuscriptBlockId: string]: string[];
 }
 
+function marginLinkIndexEquals(a: MarginLinkIndex, b: MarginLinkIndex): boolean {
+  if (a === b) {
+    return true;
+  }
+
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  for (const key of aKeys) {
+    const aLinks = a[key];
+    const bLinks = b[key];
+    if (!Array.isArray(aLinks) || !Array.isArray(bLinks) || aLinks.length !== bLinks.length) {
+      return false;
+    }
+    for (let index = 0; index < aLinks.length; index += 1) {
+      if (aLinks[index] !== bLinks[index]) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 interface AppState {
   db: Database | null;
   prefsStore: Store | null;
@@ -95,9 +122,24 @@ export const useAppStore = create<AppState>((set) => ({
   setThemeMode: (themeMode) => set({ themeMode }),
   setHighContrast: (highContrast) => set({ highContrast }),
   setPaneSizes: (paneSizes) => set({ paneSizes }),
-  setCurrentManuscriptBlockId: (currentManuscriptBlockId) => set({ currentManuscriptBlockId }),
-  setLeftCurrentBlockId: (leftCurrentBlockId) => set({ leftCurrentBlockId }),
-  setRightCurrentBlockId: (rightCurrentBlockId) => set({ rightCurrentBlockId }),
-  setLeftLinksByManuscriptBlockId: (leftLinksByManuscriptBlockId) => set({ leftLinksByManuscriptBlockId }),
-  setRightLinksByManuscriptBlockId: (rightLinksByManuscriptBlockId) => set({ rightLinksByManuscriptBlockId }),
+  setCurrentManuscriptBlockId: (currentManuscriptBlockId) =>
+    set((state) =>
+      state.currentManuscriptBlockId === currentManuscriptBlockId ? state : { currentManuscriptBlockId }
+    ),
+  setLeftCurrentBlockId: (leftCurrentBlockId) =>
+    set((state) => (state.leftCurrentBlockId === leftCurrentBlockId ? state : { leftCurrentBlockId })),
+  setRightCurrentBlockId: (rightCurrentBlockId) =>
+    set((state) => (state.rightCurrentBlockId === rightCurrentBlockId ? state : { rightCurrentBlockId })),
+  setLeftLinksByManuscriptBlockId: (leftLinksByManuscriptBlockId) =>
+    set((state) =>
+      marginLinkIndexEquals(state.leftLinksByManuscriptBlockId, leftLinksByManuscriptBlockId)
+        ? state
+        : { leftLinksByManuscriptBlockId }
+    ),
+  setRightLinksByManuscriptBlockId: (rightLinksByManuscriptBlockId) =>
+    set((state) =>
+      marginLinkIndexEquals(state.rightLinksByManuscriptBlockId, rightLinksByManuscriptBlockId)
+        ? state
+        : { rightLinksByManuscriptBlockId }
+    ),
 }));

@@ -21,6 +21,9 @@ const MIN_LEFT_RATIO = 0.18;
 const MAX_LEFT_RATIO = 0.42;
 const MIN_RIGHT_RATIO = 0.16;
 const MAX_RIGHT_RATIO = 0.36;
+// Safety fallback: pointer-capture based resize can lock input on some Windows/WebView setups.
+// Keep keyboard resize active, but disable pointer resize until a fully stable implementation lands.
+const ENABLE_POINTER_RESIZE = false;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -34,11 +37,23 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
     if (!root) {
       return;
     }
+    if (!event.isPrimary || event.button !== 0) {
+      return;
+    }
 
     const bounds = root.getBoundingClientRect();
     const startLeft = props.paneSizes.left;
     const startRight = props.paneSizes.right;
     const pointerId = event.pointerId;
+    const handle = event.currentTarget;
+    const previousBodyUserSelect = document.body.style.userSelect;
+    const previousBodyCursor = document.body.style.cursor;
+    let cleaned = false;
+
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    event.preventDefault();
 
     const move = (moveEvent: PointerEvent) => {
       if (side === "left") {
@@ -56,17 +71,56 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
       }
     };
 
-    const end = () => {
+    const cleanup = () => {
+      if (cleaned) {
+        return;
+      }
+      cleaned = true;
+
       window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-      root.releasePointerCapture(pointerId);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
+      window.removeEventListener("blur", onWindowBlur);
+      handle.removeEventListener("lostpointercapture", onLostPointerCapture as EventListener);
+      document.body.style.userSelect = previousBodyUserSelect;
+      document.body.style.cursor = previousBodyCursor;
+
+      if (handle.hasPointerCapture(pointerId)) {
+        handle.releasePointerCapture(pointerId);
+      }
     };
 
-    root.setPointerCapture(pointerId);
+    const onPointerUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) {
+        return;
+      }
+      cleanup();
+    };
+
+    const onPointerCancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== pointerId) {
+        return;
+      }
+      cleanup();
+    };
+
+    const onWindowBlur = () => {
+      cleanup();
+    };
+
+    const onLostPointerCapture = (lostEvent: PointerEvent) => {
+      if (lostEvent.pointerId !== pointerId) {
+        return;
+      }
+      cleanup();
+    };
+
+    handle.setPointerCapture(pointerId);
+    handle.addEventListener("lostpointercapture", onLostPointerCapture as EventListener);
     window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerCancel);
+    window.addEventListener("blur", onWindowBlur);
   };
 
   const handleResizerKey = (side: "left" | "right") => (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -104,7 +158,7 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
         role="separator"
         aria-label="Resize left pane"
         tabIndex={0}
-        onPointerDown={handleResizeStart("left")}
+        onPointerDown={ENABLE_POINTER_RESIZE ? handleResizeStart("left") : undefined}
         onKeyDown={handleResizerKey("left")}
       />
       <section className="pane pane-center" data-active={props.activePane === "center"}>{props.center}</section>
@@ -113,7 +167,7 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
         role="separator"
         aria-label="Resize right pane"
         tabIndex={props.rightVisible ? 0 : -1}
-        onPointerDown={props.rightVisible ? handleResizeStart("right") : undefined}
+        onPointerDown={props.rightVisible && ENABLE_POINTER_RESIZE ? handleResizeStart("right") : undefined}
         onKeyDown={props.rightVisible ? handleResizerKey("right") : undefined}
       />
       <section className="pane pane-right" data-active={props.activePane === "right"}>{props.rightVisible ? props.right : null}</section>

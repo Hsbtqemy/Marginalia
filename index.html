@@ -5,10 +5,39 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Marginalia</title>
+    <script>
+      window.__marginaliaBootFail = function(message) {
+        const root = document.getElementById('root');
+        if (!root) return;
+        root.innerHTML = `
+          <div style="padding:16px;font-family:Segoe UI,Arial,sans-serif;background:#1f1f1f;color:#f3f3f3;min-height:100vh">
+            <h2 style="margin:0 0 12px">Marginalia startup error</h2>
+            <pre style="white-space:pre-wrap;word-break:break-word;background:#2b2b2b;border:1px solid #444;padding:12px;border-radius:8px">${message}</pre>
+          </div>
+        `;
+      };
+      window.addEventListener('error', function(event) {
+        const target = event.target;
+        if (target && target.tagName === 'SCRIPT') {
+          window.__marginaliaBootFail('Failed to load script: ' + (target.src || 'unknown'));
+          return;
+        }
+        window.__marginaliaBootFail((event.error && event.error.stack) || event.message || 'Unknown startup error.');
+      }, true);
+      window.addEventListener('unhandledrejection', function(event) {
+        const reason = event.reason;
+        const message = typeof reason === 'string'
+          ? reason
+          : (reason && (reason.stack || reason.message)) || JSON.stringify(reason, null, 2);
+        window.__marginaliaBootFail(message);
+      });
+    </script>
   </head>
 
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="root" style="padding:12px;font-family:Segoe UI,Arial,sans-serif;color:#222">
+      Marginalia is loading...
+    </div>
+    <script type="module" src="/src/main.tsx" onerror="window.__marginaliaBootFail('Failed to load /src/main.tsx')"></script>
   </body>
 </html>

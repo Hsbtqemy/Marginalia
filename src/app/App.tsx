@@ -38,6 +38,45 @@ import { debounce } from "../utils/debounce";
 
 const PREFS_FILE = "ui-preferences.json";
 
+function releaseStuckPointerState(): void {
+  const pointerIds = [1, 2, 3, 4, 5];
+  const allElements = document.querySelectorAll<HTMLElement>("*");
+  for (const element of allElements) {
+    if (typeof element.hasPointerCapture !== "function") {
+      continue;
+    }
+    for (const pointerId of pointerIds) {
+      try {
+        if (element.hasPointerCapture(pointerId)) {
+          element.releasePointerCapture(pointerId);
+        }
+      } catch {
+        // Ignore stale pointer capture handles.
+      }
+    }
+  }
+
+  document.body.style.userSelect = "";
+  if (document.body.style.cursor === "grabbing" || document.body.style.cursor === "col-resize") {
+    document.body.style.cursor = "";
+  }
+
+  const draggingRoots = document.querySelectorAll<HTMLElement>("[data-dragging='true']");
+  for (const root of draggingRoots) {
+    delete root.dataset.dragging;
+  }
+
+  const grabbedHandles = document.querySelectorAll<HTMLElement>("[data-grabbed='true']");
+  for (const handle of grabbedHandles) {
+    handle.dataset.grabbed = "false";
+  }
+
+  const dropTargets = document.querySelectorAll<HTMLElement>("[data-drop-position]");
+  for (const target of dropTargets) {
+    delete target.dataset.dropPosition;
+  }
+}
+
 function sanitizeFilename(text: string): string {
   return text
     .trim()
@@ -300,6 +339,35 @@ export default function App() {
     applyTheme({ mode: themeMode, highContrast });
     return subscribeToSystemTheme(() => applyTheme({ mode: themeMode, highContrast }));
   }, [themeMode, highContrast]);
+
+  useEffect(() => {
+    const onPointerRelease = () => releaseStuckPointerState();
+    const onWindowBlur = () => releaseStuckPointerState();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        releaseStuckPointerState();
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        releaseStuckPointerState();
+      }
+    };
+
+    window.addEventListener("pointerup", onPointerRelease, true);
+    window.addEventListener("pointercancel", onPointerRelease, true);
+    window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pointerup", onPointerRelease, true);
+      window.removeEventListener("pointercancel", onPointerRelease, true);
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   const currentDocument = useMemo(
     () => documents.find((document) => document.id === currentDocumentId) ?? null,
@@ -938,7 +1006,7 @@ export default function App() {
             ref={leftEditorRef}
             initialStateJson={leftMarginJson}
             manuscriptExcerptByBlockId={manuscriptExcerptByBlockId}
-            onAutosave={(json) => void saveLeftMargin(json)}
+            onAutosave={saveLeftMargin}
             onCurrentBlockIdChange={setLeftCurrentBlockId}
             onLinkIndexChange={setLeftLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}
@@ -955,7 +1023,7 @@ export default function App() {
             ref={manuscriptEditorRef}
             initialStateJson={manuscriptJson}
             pagePreview={pagePreview}
-            onAutosave={(json) => void saveManuscript(json)}
+            onAutosave={saveManuscript}
             onCurrentBlockIdChange={setCurrentManuscriptBlockId}
             onCreateLinkedMarginalia={handleCreateLinkedMarginalia}
             onRevealMarginalia={handleRevealMarginalia}
@@ -972,7 +1040,7 @@ export default function App() {
             ref={rightEditorRef}
             initialStateJson={rightMarginJson}
             manuscriptExcerptByBlockId={manuscriptExcerptByBlockId}
-            onAutosave={(json) => void saveRightMargin(json)}
+            onAutosave={saveRightMargin}
             onCurrentBlockIdChange={setRightCurrentBlockId}
             onLinkIndexChange={setRightLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}

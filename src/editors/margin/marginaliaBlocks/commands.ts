@@ -177,6 +177,10 @@ export function $linkCurrentMarginaliaBlock(manuscriptBlockId: string | null): b
     return false;
   }
 
+  if (current.getLinkedManuscriptBlockId() === manuscriptBlockId) {
+    return true;
+  }
+
   current.setLinkedManuscriptBlockId(manuscriptBlockId);
   return true;
 }
@@ -325,13 +329,22 @@ export function $mergeCurrentMarginaliaBlock(direction: "previous" | "next"): bo
 }
 
 export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKind): () => void {
+  const runUpdateSafely = (callback: () => void): boolean => {
+    try {
+      editor.update(callback);
+      return true;
+    } catch (error) {
+      console.error("Marginalia command failed", error);
+      return false;
+    }
+  };
+
   const unregisterInsert = editor.registerCommand(
     INSERT_MARGINALIA_BLOCK_COMMAND,
     (payload) => {
-      editor.update(() => {
+      return runUpdateSafely(() => {
         $insertMarginaliaBlock({ ...payload, kind });
       });
-      return true;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -340,10 +353,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     LINK_CURRENT_MARGINALIA_BLOCK_COMMAND,
     ({ manuscriptBlockId }) => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $linkCurrentMarginaliaBlock(manuscriptBlockId);
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -352,10 +365,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $linkCurrentMarginaliaBlock(null);
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -364,10 +377,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $moveCurrentMarginaliaBlock("up");
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -376,10 +389,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $moveCurrentMarginaliaBlock("down");
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -388,10 +401,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     DELETE_CURRENT_MARGINALIA_BLOCK_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $deleteCurrentMarginaliaBlock(kind);
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -400,10 +413,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     DUPLICATE_CURRENT_MARGINALIA_BLOCK_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $duplicateCurrentMarginaliaBlock();
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -412,10 +425,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     SPLIT_CURRENT_MARGINALIA_BLOCK_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $splitCurrentMarginaliaBlock();
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -424,10 +437,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     MERGE_CURRENT_MARGINALIA_BLOCK_WITH_PREVIOUS_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $mergeCurrentMarginaliaBlock("previous");
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );
@@ -436,10 +449,10 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     MERGE_CURRENT_MARGINALIA_BLOCK_WITH_NEXT_COMMAND,
     () => {
       let handled = false;
-      editor.update(() => {
+      const updated = runUpdateSafely(() => {
         handled = $mergeCurrentMarginaliaBlock("next");
       });
-      return handled;
+      return updated && handled;
     },
     COMMAND_PRIORITY_EDITOR,
   );

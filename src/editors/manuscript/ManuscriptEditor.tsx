@@ -1,4 +1,5 @@
 import {
+  useCallback,
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -97,6 +98,15 @@ const DEFAULT_MANUSCRIPT_TOOLBAR_STATE: ManuscriptToolbarState = {
   blockType: "paragraph",
 };
 
+function manuscriptToolbarStateEquals(a: ManuscriptToolbarState, b: ManuscriptToolbarState): boolean {
+  return (
+    a.bold === b.bold &&
+    a.italic === b.italic &&
+    a.underline === b.underline &&
+    a.blockType === b.blockType
+  );
+}
+
 function applyManuscriptBlockType(editor: LexicalEditor, type: "paragraph" | "h1" | "h2" | "h3" | "quote"): void {
   editor.update(() => {
     const selection = $getSelection();
@@ -160,6 +170,29 @@ function EditorBridgePlugin(props: {
   onFocusChange?: (focused: boolean) => void;
 }): null {
   const [editor] = useLexicalComposerContext();
+  const callbacksRef = useRef({
+    onCreateLinkedMarginalia: props.onCreateLinkedMarginalia,
+    onRevealMarginalia: props.onRevealMarginalia,
+    onToolbarStateChange: props.onToolbarStateChange,
+    onBlurSave: props.onBlurSave,
+    onFocusChange: props.onFocusChange,
+  });
+
+  useEffect(() => {
+    callbacksRef.current = {
+      onCreateLinkedMarginalia: props.onCreateLinkedMarginalia,
+      onRevealMarginalia: props.onRevealMarginalia,
+      onToolbarStateChange: props.onToolbarStateChange,
+      onBlurSave: props.onBlurSave,
+      onFocusChange: props.onFocusChange,
+    };
+  }, [
+    props.onCreateLinkedMarginalia,
+    props.onRevealMarginalia,
+    props.onToolbarStateChange,
+    props.onBlurSave,
+    props.onFocusChange,
+  ]);
 
   useEffect(() => {
     props.editorRef.current = editor;
@@ -171,7 +204,7 @@ function EditorBridgePlugin(props: {
   useEffect(() => {
     const syncToolbarState = () => {
       editor.getEditorState().read(() => {
-        props.onToolbarStateChange(readManuscriptToolbarState());
+        callbacksRef.current.onToolbarStateChange(readManuscriptToolbarState());
       });
     };
 
@@ -190,14 +223,14 @@ function EditorBridgePlugin(props: {
           if (lowerKey === "n") {
             event.preventDefault();
             editor.getEditorState().read(() => {
-              props.onCreateLinkedMarginalia(getCurrentSelectionBlockId());
+              callbacksRef.current.onCreateLinkedMarginalia(getCurrentSelectionBlockId());
             });
             return true;
           }
           if (lowerKey === "g") {
             event.preventDefault();
             editor.getEditorState().read(() => {
-              props.onRevealMarginalia(getCurrentSelectionBlockId());
+              callbacksRef.current.onRevealMarginalia(getCurrentSelectionBlockId());
             });
             return true;
           }
@@ -224,17 +257,19 @@ function EditorBridgePlugin(props: {
         syncToolbarState();
       }),
     );
-  }, [editor, props]);
+  }, [editor]);
 
   useEffect(() => {
     return editor.registerRootListener((rootElement, prevRootElement) => {
-      const handleBlur = () => props.onBlurSave();
-      const handleFocusIn = () => props.onFocusChange?.(true);
+      const handleBlur = () => callbacksRef.current.onBlurSave();
+      const handleFocusIn = () => callbacksRef.current.onFocusChange?.(true);
       const handleFocusOut = () => {
         window.setTimeout(() => {
           const root = editor.getRootElement();
           const activeElement = document.activeElement;
-          props.onFocusChange?.(Boolean(root && activeElement instanceof Node && root.contains(activeElement)));
+          callbacksRef.current.onFocusChange?.(
+            Boolean(root && activeElement instanceof Node && root.contains(activeElement))
+          );
         }, 0);
       };
       if (prevRootElement) {
@@ -248,7 +283,7 @@ function EditorBridgePlugin(props: {
         rootElement.addEventListener("focusout", handleFocusOut);
       }
     });
-  }, [editor, props]);
+  }, [editor]);
 
   return null;
 }
@@ -416,7 +451,21 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
     const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
     const leftLinksByManuscriptBlockId = useAppStore((state) => state.leftLinksByManuscriptBlockId);
     const rightLinksByManuscriptBlockId = useAppStore((state) => state.rightLinksByManuscriptBlockId);
-    const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props]);
+    const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props.onAutosave]);
+    const handleToolbarStateChange = useCallback((nextState: ManuscriptToolbarState) => {
+      setToolbarState((previousState) =>
+        manuscriptToolbarStateEquals(previousState, nextState) ? previousState : nextState
+      );
+    }, []);
+    const handleBlurSave = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) {
+        return;
+      }
+      const json = JSON.stringify(editor.getEditorState().toJSON());
+      autosave.cancel();
+      props.onAutosave(json);
+    }, [autosave, props.onAutosave]);
 
     useEffect(() => {
       return () => {
@@ -539,17 +588,9 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
             editorRef={editorRef}
             onCreateLinkedMarginalia={props.onCreateLinkedMarginalia}
             onRevealMarginalia={props.onRevealMarginalia}
-            onToolbarStateChange={setToolbarState}
+            onToolbarStateChange={handleToolbarStateChange}
             onFocusChange={props.onFocusChange}
-            onBlurSave={() => {
-              const editor = editorRef.current;
-              if (!editor) {
-                return;
-              }
-              const json = JSON.stringify(editor.getEditorState().toJSON());
-              autosave.cancel();
-              props.onAutosave(json);
-            }}
+            onBlurSave={handleBlurSave}
           />
         </LexicalComposer>
       </div>

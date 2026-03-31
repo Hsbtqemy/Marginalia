@@ -20,8 +20,13 @@ function handleBlockIdTransform(node: LexicalNode): void {
 
 export function BlockIdPlugin(props: { onCurrentBlockIdChange: (blockId: string | null) => void }): null {
   const [editor] = useLexicalComposerContext();
+  const { onCurrentBlockIdChange } = props;
 
   useEffect(() => {
+    editor.getEditorState().read(() => {
+      onCurrentBlockIdChange(getCurrentSelectionBlockId());
+    });
+
     return mergeRegister(
       editor.registerNodeTransform(ParagraphNode, handleBlockIdTransform),
       editor.registerNodeTransform(HeadingNode, handleBlockIdTransform),
@@ -31,7 +36,7 @@ export function BlockIdPlugin(props: { onCurrentBlockIdChange: (blockId: string 
         SELECTION_CHANGE_COMMAND,
         () => {
           editor.getEditorState().read(() => {
-            props.onCurrentBlockIdChange(getCurrentSelectionBlockId());
+            onCurrentBlockIdChange(getCurrentSelectionBlockId());
           });
           return false;
         },
@@ -39,14 +44,11 @@ export function BlockIdPlugin(props: { onCurrentBlockIdChange: (blockId: string 
       ),
       editor.registerUpdateListener(({ editorState }) => {
         const bindings: Array<{ key: string; blockId: string }> = [];
-        let currentBlockId: string | null = null;
 
         editorState.read(() => {
           bindings.push(...collectBlockDomBindings());
-          currentBlockId = getCurrentSelectionBlockId();
         });
 
-        props.onCurrentBlockIdChange(currentBlockId);
         for (const binding of bindings) {
           const element = editor.getElementByKey(binding.key);
           if (element) {
@@ -55,7 +57,7 @@ export function BlockIdPlugin(props: { onCurrentBlockIdChange: (blockId: string 
         }
       }),
     );
-  }, [editor, props]);
+  }, [editor, onCurrentBlockIdChange]);
 
   return null;
 }
