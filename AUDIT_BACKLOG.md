@@ -31,6 +31,41 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 | UX-06 | P2 | UX/UI | Recomposer la topbar et la navigation document | M | Moyen |
 | DX-01 | P2 | DX | Corriger les details de finition du projet | S | Faible |
 
+## Etat d'avancement (2026-04-01)
+
+| ID | Statut |
+|---|---|
+| SEC-01 | done |
+| PERF-01 | done |
+| REL-01 | done |
+| DATA-01 | done |
+| SEC-02 | done |
+| DATA-02 | done |
+| QA-01 | in progress |
+| EXP-01 | done |
+| EXP-02 | todo |
+| UX-01 | done |
+| UX-02 | in progress |
+| UX-03 | in progress |
+| UX-04 | in progress |
+| UX-05 | in progress |
+| UX-06 | in progress |
+| DX-01 | done |
+
+### Resume
+
+- done: 8
+- in progress: 6
+- todo: 1
+- hors backlog initial (critique): stabilite UX autour de `New linked note` (plantage/interactions gelees selon scenario utilisateur)
+
+### Reste a faire priorise
+
+1. `QA-01`: finaliser le socle de tests (renforcer surtout la couverture DB/queries et scenarios UI critiques).
+2. `UX-02`, `UX-03`, `UX-04`, `UX-06`: terminer la passe writer-first (hierarchie manuscrit, marge carnet, densite d'aides, topbar).
+3. `UX-05`: finaliser la signature visuelle editoriale (coherence globale + captures avant/apres).
+4. `EXP-02`: phase export DOCX fidelity apres stabilisation UX/QA.
+
 ---
 
 ## P0 - A traiter d'abord
