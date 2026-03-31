@@ -45,7 +45,7 @@ function createBlockHandle(marginBlockId: string): HTMLButtonElement {
   handle.dataset.grabbed = "false";
   handle.setAttribute("aria-label", "Reorder block");
   handle.setAttribute("aria-grabbed", "false");
-  handle.textContent = "Drag";
+  handle.textContent = "Move";
   return handle;
 }
 
@@ -56,7 +56,7 @@ function createBlockHeader(marginBlockId: string): HTMLDivElement {
   const meta = document.createElement("span");
   meta.className = "marginalia-block-meta";
   meta.dataset.marginaliaMeta = "true";
-  meta.textContent = "Standalone";
+  meta.textContent = "Free note";
   header.append(createBlockHandle(marginBlockId));
   header.append(meta);
   return header;
@@ -174,8 +174,8 @@ export class MarginaliaBlockNode extends ElementNode {
     const meta = element.querySelector<HTMLElement>(MARGINALIA_META_SELECTOR);
     if (meta) {
       meta.textContent = this.__linkedManuscriptBlockId
-        ? `Linked to ${this.__linkedManuscriptBlockId.slice(0, 8)}`
-        : "Standalone";
+        ? `Linked passage ${this.__linkedManuscriptBlockId.slice(0, 8)}`
+        : "Free note";
     }
     const preview = element.querySelector<HTMLElement>(MARGINALIA_PREVIEW_SELECTOR);
     if (preview) {
@@ -216,8 +216,8 @@ export class MarginaliaBlockNode extends ElementNode {
     const meta = dom.querySelector<HTMLElement>(MARGINALIA_META_SELECTOR);
     if (meta) {
       meta.textContent = this.__linkedManuscriptBlockId
-        ? `Linked to ${this.__linkedManuscriptBlockId.slice(0, 8)}`
-        : "Standalone";
+        ? `Linked passage ${this.__linkedManuscriptBlockId.slice(0, 8)}`
+        : "Free note";
     }
     const preview = dom.querySelector<HTMLElement>(MARGINALIA_PREVIEW_SELECTOR);
     if (preview) {

@@ -12,6 +12,7 @@ interface ThreePaneLayoutProps {
   center: ReactNode;
   right: ReactNode;
   rightVisible: boolean;
+  activePane: "left" | "center" | "right" | null;
   paneSizes: PaneSizes;
   onPaneSizesChange: (sizes: PaneSizes) => void;
 }
@@ -97,7 +98,7 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
 
   return (
     <div ref={rootRef} className="three-pane-root" data-right-hidden={!props.rightVisible} style={style}>
-      <section className="pane pane-left">{props.left}</section>
+      <section className="pane pane-left" data-active={props.activePane === "left"}>{props.left}</section>
       <div
         className="resizer"
         role="separator"
@@ -106,7 +107,7 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
         onPointerDown={handleResizeStart("left")}
         onKeyDown={handleResizerKey("left")}
       />
-      <section className="pane pane-center">{props.center}</section>
+      <section className="pane pane-center" data-active={props.activePane === "center"}>{props.center}</section>
       <div
         className="resizer"
         role="separator"
@@ -115,7 +116,7 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
         onPointerDown={props.rightVisible ? handleResizeStart("right") : undefined}
         onKeyDown={props.rightVisible ? handleResizerKey("right") : undefined}
       />
-      <section className="pane pane-right">{props.rightVisible ? props.right : null}</section>
+      <section className="pane pane-right" data-active={props.activePane === "right"}>{props.rightVisible ? props.right : null}</section>
     </div>
   );
 }

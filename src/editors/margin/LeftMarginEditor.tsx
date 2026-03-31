@@ -10,6 +10,7 @@ interface LeftMarginEditorProps {
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
+  onFocusChange?: (focused: boolean) => void;
 }
 
 export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEditorProps>(
@@ -19,12 +20,14 @@ export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEdi
         ref={ref}
         kind="left"
         title="Marginalia"
+        subtitle="Working notes, reflections, and linked passages."
         initialStateJson={props.initialStateJson}
         manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
         onAutosave={props.onAutosave}
         onCurrentBlockIdChange={props.onCurrentBlockIdChange}
         onLinkIndexChange={props.onLinkIndexChange}
         onNavigateToManuscriptBlock={props.onNavigateToManuscriptBlock}
+        onFocusChange={props.onFocusChange}
       />
     );
   },

@@ -115,6 +115,7 @@ export default function App() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
+  const [activePane, setActivePane] = useState<"left" | "center" | "right" | null>("center");
 
   const persistPreference = useCallback(
     async (key: string, value: unknown) => {
@@ -876,37 +877,45 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-topbar">
-        <div className="app-topbar-title">Marginalia</div>
+        <div className="app-topbar-document">
+          <div className="app-topbar-title">Marginalia</div>
+          <select
+            className="app-select app-document-select"
+            value={currentDocumentId}
+            onChange={(event) => {
+              void loadDocumentIntoEditors(event.target.value);
+            }}
+          >
+            {documents.map((document) => (
+              <option key={document.id} value={document.id}>
+                {document.title}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <select
-          className="app-select"
-          value={currentDocumentId}
-          onChange={(event) => {
-            void loadDocumentIntoEditors(event.target.value);
-          }}
-        >
-          {documents.map((document) => (
-            <option key={document.id} value={document.id}>
-              {document.title}
-            </option>
-          ))}
-        </select>
+        <div className="app-topbar-actions">
+          <button className="secondary-button" type="button" onClick={() => void handleNewDocument()}>
+            New
+          </button>
+          <button className="secondary-button" type="button" onClick={() => setPresetManagerOpen(true)}>
+            Export Styles...
+          </button>
+          <button className="secondary-button" type="button" onClick={handleOpenPrintPreview}>
+            Page Preview
+          </button>
+          <button className="secondary-button" type="button" onClick={() => setCommandPaletteOpen(true)}>
+            Quick Actions
+          </button>
+        </div>
 
-        <button className="secondary-button" type="button" onClick={() => void handleNewDocument()}>
-          New
-        </button>
-        <button className="secondary-button" type="button" onClick={() => setPresetManagerOpen(true)}>
-          Export Styles...
-        </button>
-        <button className="secondary-button" type="button" onClick={handleOpenPrintPreview}>
-          Page Preview
-        </button>
-        <button className="secondary-button" type="button" onClick={() => setCommandPaletteOpen(true)}>
-          Quick Actions
-        </button>
-
-        <span className="app-chip">Preset: {activePreset?.name ?? "No preset"}</span>
-        <span className="app-chip">Ctrl/Cmd+K</span>
+        <div className="app-topbar-meta">
+          <span className="app-chip">Style: {activePreset?.name ?? "No preset"}</span>
+          <span className="app-chip">
+            Focus: {activePane === "left" ? "Marginalia" : activePane === "right" ? "Sources & Notes" : "Manuscript"}
+          </span>
+          <span className="app-chip">Quick Actions: Ctrl/Cmd+K</span>
+        </div>
       </header>
 
       {statusMessage ? (
@@ -920,6 +929,7 @@ export default function App() {
 
       <ThreePaneLayout
         rightVisible={rightPaneVisible}
+        activePane={activePane}
         paneSizes={paneSizes}
         onPaneSizesChange={handleSetPaneSizes}
         left={
@@ -932,6 +942,11 @@ export default function App() {
             onCurrentBlockIdChange={setLeftCurrentBlockId}
             onLinkIndexChange={setLeftLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}
+            onFocusChange={(focused) => {
+              if (focused) {
+                setActivePane("left");
+              }
+            }}
           />
         }
         center={
@@ -944,6 +959,11 @@ export default function App() {
             onCurrentBlockIdChange={setCurrentManuscriptBlockId}
             onCreateLinkedMarginalia={handleCreateLinkedMarginalia}
             onRevealMarginalia={handleRevealMarginalia}
+            onFocusChange={(focused) => {
+              if (focused) {
+                setActivePane("center");
+              }
+            }}
           />
         }
         right={
@@ -956,6 +976,11 @@ export default function App() {
             onCurrentBlockIdChange={setRightCurrentBlockId}
             onLinkIndexChange={setRightLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}
+            onFocusChange={(focused) => {
+              if (focused) {
+                setActivePane("right");
+              }
+            }}
           />
         }
       />

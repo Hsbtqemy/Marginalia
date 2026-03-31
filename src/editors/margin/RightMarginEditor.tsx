@@ -10,6 +10,7 @@ interface RightMarginEditorProps {
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
+  onFocusChange?: (focused: boolean) => void;
 }
 
 export const RightMarginEditor = forwardRef<RightMarginEditorHandle, RightMarginEditorProps>(
@@ -19,12 +20,14 @@ export const RightMarginEditor = forwardRef<RightMarginEditorHandle, RightMargin
         ref={ref}
         kind="right"
         title="Sources & Notes"
+        subtitle="Citations, references, and supporting notes."
         initialStateJson={props.initialStateJson}
         manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
         onAutosave={props.onAutosave}
         onCurrentBlockIdChange={props.onCurrentBlockIdChange}
         onLinkIndexChange={props.onLinkIndexChange}
         onNavigateToManuscriptBlock={props.onNavigateToManuscriptBlock}
+        onFocusChange={props.onFocusChange}
       />
     );
   },

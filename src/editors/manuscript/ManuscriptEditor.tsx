@@ -78,6 +78,7 @@ interface ManuscriptEditorProps {
   onCurrentBlockIdChange: (blockId: string | null) => void;
   onCreateLinkedMarginalia: (manuscriptBlockId: string | null) => void;
   onRevealMarginalia: (manuscriptBlockId: string | null) => void;
+  onFocusChange?: (focused: boolean) => void;
 }
 
 type ManuscriptBlockType = "paragraph" | "h1" | "h2" | "h3" | "quote" | "bullets" | "numbers";
@@ -156,6 +157,7 @@ function EditorBridgePlugin(props: {
   onRevealMarginalia: (manuscriptBlockId: string | null) => void;
   onToolbarStateChange: (state: ManuscriptToolbarState) => void;
   onBlurSave: () => void;
+  onFocusChange?: (focused: boolean) => void;
 }): null {
   const [editor] = useLexicalComposerContext();
 
@@ -227,11 +229,23 @@ function EditorBridgePlugin(props: {
   useEffect(() => {
     return editor.registerRootListener((rootElement, prevRootElement) => {
       const handleBlur = () => props.onBlurSave();
+      const handleFocusIn = () => props.onFocusChange?.(true);
+      const handleFocusOut = () => {
+        window.setTimeout(() => {
+          const root = editor.getRootElement();
+          const activeElement = document.activeElement;
+          props.onFocusChange?.(Boolean(root && activeElement instanceof Node && root.contains(activeElement)));
+        }, 0);
+      };
       if (prevRootElement) {
         prevRootElement.removeEventListener("blur", handleBlur, true);
+        prevRootElement.removeEventListener("focusin", handleFocusIn);
+        prevRootElement.removeEventListener("focusout", handleFocusOut);
       }
       if (rootElement) {
         rootElement.addEventListener("blur", handleBlur, true);
+        rootElement.addEventListener("focusin", handleFocusIn);
+        rootElement.addEventListener("focusout", handleFocusOut);
       }
     });
   }, [editor, props]);
@@ -266,115 +280,130 @@ function ManuscriptToolbar(props: {
 
   return (
     <>
-      <div className="editor-toolbar">
+      <div className="editor-toolbar editor-toolbar-manuscript">
         <span className="editor-toolbar-label">Manuscript</span>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.bold ? "true" : "false"}
-          type="button"
-          onClick={() => runInEditor((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold"))}
-        >
-          Bold
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.italic ? "true" : "false"}
-          type="button"
-          onClick={() => runInEditor((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic"))}
-        >
-          Italic
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.underline ? "true" : "false"}
-          type="button"
-          onClick={() => runInEditor((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline"))}
-        >
-          Underline
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.blockType === "h1" ? "true" : "false"}
-          type="button"
-          onClick={() => setBlockType("h1")}
-        >
-          H1
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.blockType === "h2" ? "true" : "false"}
-          type="button"
-          onClick={() => setBlockType("h2")}
-        >
-          H2
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.blockType === "h3" ? "true" : "false"}
-          type="button"
-          onClick={() => setBlockType("h3")}
-        >
-          H3
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.blockType === "quote" ? "true" : "false"}
-          type="button"
-          onClick={() => setBlockType("quote")}
-        >
-          Quote
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.blockType === "bullets" ? "true" : "false"}
-          type="button"
-          onClick={() => runInEditor((editor) => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined))}
-        >
-          Bullets
-        </button>
-        <button
-          className="toolbar-button"
-          data-active={props.toolbarState.blockType === "numbers" ? "true" : "false"}
-          type="button"
-          onClick={() => runInEditor((editor) => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined))}
-        >
-          Numbers
-        </button>
-        <button className="toolbar-button" type="button" onClick={() => runInEditor((editor) => editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined))}>
-          No List
-        </button>
-        <button
-          className="toolbar-button"
-          type="button"
-          disabled={!currentManuscriptBlockId}
-          onClick={() => props.onCreateLinkedMarginalia(currentManuscriptBlockId)}
-        >
-          New Linked Note
-        </button>
-        <button
-          className="toolbar-button"
-          type="button"
-          disabled={!currentManuscriptBlockId}
-          onClick={() => props.onRevealMarginalia(currentManuscriptBlockId)}
-        >
-          Show Notes
-        </button>
+        <div className="toolbar-inline-group toolbar-inline-group-primary">
+          <button
+            className="toolbar-button toolbar-button-prominent"
+            type="button"
+            disabled={!currentManuscriptBlockId}
+            onClick={() => props.onCreateLinkedMarginalia(currentManuscriptBlockId)}
+          >
+            New Linked Note
+          </button>
+          <button
+            className="toolbar-button toolbar-button-compact"
+            type="button"
+            disabled={!currentManuscriptBlockId}
+            onClick={() => props.onRevealMarginalia(currentManuscriptBlockId)}
+          >
+            Show Notes
+          </button>
+        </div>
+        <details className="editor-advanced-tools">
+          <summary>Format</summary>
+          <div className="editor-advanced-tools-body">
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.bold ? "true" : "false"}
+              type="button"
+              onClick={() => runInEditor((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold"))}
+            >
+              Bold
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.italic ? "true" : "false"}
+              type="button"
+              onClick={() => runInEditor((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic"))}
+            >
+              Italic
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.underline ? "true" : "false"}
+              type="button"
+              onClick={() => runInEditor((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline"))}
+            >
+              Underline
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.blockType === "h1" ? "true" : "false"}
+              type="button"
+              onClick={() => setBlockType("h1")}
+            >
+              H1
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.blockType === "h2" ? "true" : "false"}
+              type="button"
+              onClick={() => setBlockType("h2")}
+            >
+              H2
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.blockType === "h3" ? "true" : "false"}
+              type="button"
+              onClick={() => setBlockType("h3")}
+            >
+              H3
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.blockType === "quote" ? "true" : "false"}
+              type="button"
+              onClick={() => setBlockType("quote")}
+            >
+              Quote
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.blockType === "bullets" ? "true" : "false"}
+              type="button"
+              onClick={() => runInEditor((editor) => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined))}
+            >
+              Bullets
+            </button>
+            <button
+              className="toolbar-button"
+              data-active={props.toolbarState.blockType === "numbers" ? "true" : "false"}
+              type="button"
+              onClick={() => runInEditor((editor) => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined))}
+            >
+              Numbers
+            </button>
+            <button className="toolbar-button" type="button" onClick={() => runInEditor((editor) => editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined))}>
+              No List
+            </button>
+          </div>
+        </details>
       </div>
       <div className="margin-writing-status">
-        <span className={`margin-status-chip ${currentManuscriptBlockId ? "is-targeting" : ""}`}>
-          {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select a passage"}
-        </span>
-        <span className="margin-status-copy">
-          {currentManuscriptBlockId
-            ? "This passage can anchor linked notes."
-            : "Move the cursor into a paragraph, heading, quote, or list item to target notes."}
-        </span>
-        <span className="margin-status-chip">Left notes: {linkedLeftCount}</span>
-        <span className="margin-status-chip">Right notes: {linkedRightCount}</span>
-        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked note</span>
-        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G show linked notes</span>
-        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+1/2/3 apply heading</span>
-        <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+0 return to paragraph</span>
+        <div className="editor-context-group">
+          <span className={`margin-status-chip ${currentManuscriptBlockId ? "is-targeting" : ""}`}>
+            {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select a passage"}
+          </span>
+          <span className="editor-context-copy">
+            {currentManuscriptBlockId
+              ? "Anchor notes to the current passage."
+              : "Move into a paragraph, heading, quote, or list item to target notes."}
+          </span>
+        </div>
+        <div className="editor-context-group">
+          <span className="margin-status-chip">Notes: L{linkedLeftCount} R{linkedRightCount}</span>
+        </div>
+        <details className="context-help">
+          <summary>Writing help</summary>
+          <div className="context-help-body">
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked note</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G show linked notes</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+1/2/3 apply heading</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+0 return to paragraph</span>
+          </div>
+        </details>
       </div>
     </>
   );
@@ -384,6 +413,9 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
   function ManuscriptEditorComponent(props, ref) {
     const editorRef = useRef<LexicalEditor | null>(null);
     const [toolbarState, setToolbarState] = useState<ManuscriptToolbarState>(DEFAULT_MANUSCRIPT_TOOLBAR_STATE);
+    const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
+    const leftLinksByManuscriptBlockId = useAppStore((state) => state.leftLinksByManuscriptBlockId);
+    const rightLinksByManuscriptBlockId = useAppStore((state) => state.rightLinksByManuscriptBlockId);
     const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props]);
 
     useEffect(() => {
@@ -391,6 +423,24 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
         autosave.flush();
       };
     }, [autosave]);
+
+    useEffect(() => {
+      const root = editorRef.current?.getRootElement();
+      if (!root) {
+        return;
+      }
+
+      const blockElements = root.querySelectorAll<HTMLElement>("[data-manuscript-block-id]");
+      for (const element of blockElements) {
+        const blockId = element.dataset.manuscriptBlockId ?? "";
+        const leftCount = leftLinksByManuscriptBlockId[blockId]?.length ?? 0;
+        const rightCount = rightLinksByManuscriptBlockId[blockId]?.length ?? 0;
+        element.dataset.currentBlock = blockId.length > 0 && blockId === currentManuscriptBlockId ? "true" : "false";
+        element.dataset.hasLinkedNotes = leftCount + rightCount > 0 ? "true" : "false";
+        element.dataset.leftLinkedCount = String(leftCount);
+        element.dataset.rightLinkedCount = String(rightCount);
+      }
+    }, [currentManuscriptBlockId, leftLinksByManuscriptBlockId, rightLinksByManuscriptBlockId, props.initialStateJson]);
 
     useImperativeHandle(
       ref,
@@ -452,7 +502,7 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
     );
 
     return (
-      <div className="editor-shell">
+      <div className="editor-shell editor-shell-manuscript">
         <ManuscriptToolbar
           editorRef={editorRef}
           toolbarState={toolbarState}
@@ -460,11 +510,18 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
           onRevealMarginalia={props.onRevealMarginalia}
         />
         <LexicalComposer initialConfig={initialConfig}>
-          <div className={`lexical-scroll ${props.pagePreview ? "page-preview" : ""}`}>
-            <div className="editor-content-wrap">
+          <div className={`lexical-scroll manuscript-scroll ${props.pagePreview ? "page-preview" : ""}`}>
+            <div className="editor-content-wrap manuscript-page">
               <RichTextPlugin
                 contentEditable={<ContentEditable className="lexical-editor" aria-label="Manuscript editor" />}
-                placeholder={<div className="lexical-placeholder">Write your manuscript...</div>}
+                placeholder={
+                  <div className="lexical-placeholder manuscript-placeholder">
+                    <span className="manuscript-placeholder-title">Begin the manuscript.</span>
+                    <span className="manuscript-placeholder-copy">
+                      Draft a passage here, then pull linked notes into the margin as the argument takes shape.
+                    </span>
+                  </div>
+                }
                 ErrorBoundary={LexicalErrorBoundary}
               />
             </div>
@@ -483,6 +540,7 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
             onCreateLinkedMarginalia={props.onCreateLinkedMarginalia}
             onRevealMarginalia={props.onRevealMarginalia}
             onToolbarStateChange={setToolbarState}
+            onFocusChange={props.onFocusChange}
             onBlurSave={() => {
               const editor = editorRef.current;
               if (!editor) {
