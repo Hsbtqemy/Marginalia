@@ -253,7 +253,7 @@ export default function App() {
             highContrast: false,
             pagePreview: false,
             rightPaneVisible: false,
-            paneSizes: { left: 0.24, right: 0.2 },
+            paneSizes: { left: 0.22, right: 0.18 },
           },
         });
         if (!active) {
@@ -265,7 +265,7 @@ export default function App() {
         const storedHighContrast = (await loadedPrefs.get<boolean>("highContrast")) ?? false;
         const storedPagePreview = (await loadedPrefs.get<boolean>("pagePreview")) ?? false;
         const storedRightPaneVisible = (await loadedPrefs.get<boolean>("rightPaneVisible")) ?? false;
-        const storedPaneSizes = (await loadedPrefs.get<PaneSizes>("paneSizes")) ?? { left: 0.24, right: 0.2 };
+        const storedPaneSizes = (await loadedPrefs.get<PaneSizes>("paneSizes")) ?? { left: 0.22, right: 0.18 };
 
         setThemeMode(storedThemeMode);
         setHighContrast(storedHighContrast);
@@ -572,10 +572,23 @@ export default function App() {
     void persistPreference("highContrast", next);
   }, [persistPreference, setHighContrast]);
 
-  const handleCreateLinkedMarginalia = useCallback((manuscriptBlockId: string | null) => {
-    leftEditorRef.current?.insertBlock(manuscriptBlockId);
-    leftEditorRef.current?.focusEditor();
-  }, []);
+  const handleCreateLinkedMarginalia = useCallback(
+    (manuscriptBlockId: string | null) => {
+      if (!manuscriptBlockId) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        try {
+          leftEditorRef.current?.insertBlock(manuscriptBlockId);
+          leftEditorRef.current?.focusEditor();
+        } catch (error) {
+          reportError("A linked note could not be created.", error);
+        }
+      }, 0);
+    },
+    [reportError],
+  );
 
   const handleRevealMarginalia = useCallback((manuscriptBlockId: string | null) => {
     if (!manuscriptBlockId) {
@@ -960,7 +973,6 @@ export default function App() {
               </option>
             ))}
           </select>
-          <span className="app-chip">Style: {activePreset?.name ?? "No preset"}</span>
         </div>
 
         <div className="app-topbar-actions">
@@ -976,9 +988,6 @@ export default function App() {
           <button className="secondary-button" type="button" onClick={() => setCommandPaletteOpen(true)}>
             Quick Actions
           </button>
-          <span className="app-chip">
-            Focus: {activePane === "left" ? "Marginalia" : activePane === "right" ? "Sources & Notes" : "Manuscript"}
-          </span>
         </div>
       </header>
 

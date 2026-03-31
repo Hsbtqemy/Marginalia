@@ -18,9 +18,9 @@ interface ThreePaneLayoutProps {
 }
 
 const MIN_LEFT_RATIO = 0.15;
-const MAX_LEFT_RATIO = 0.26;
+const MAX_LEFT_RATIO = 0.24;
 const MIN_RIGHT_RATIO = 0.14;
-const MAX_RIGHT_RATIO = 0.24;
+const MAX_RIGHT_RATIO = 0.22;
 // Safety fallback: pointer-capture based resize can lock input on some Windows/WebView setups.
 // Keep keyboard resize active, but disable pointer resize until a fully stable implementation lands.
 const ENABLE_POINTER_RESIZE = false;

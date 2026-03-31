@@ -150,7 +150,7 @@ textarea:focus-visible,
 .app-topbar-document {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(260px, 1fr) auto;
+  grid-template-columns: auto minmax(260px, 1fr);
   align-items: center;
   gap: var(--gap-md);
 }
@@ -248,8 +248,8 @@ textarea:focus-visible,
   display: grid;
   grid-template-columns: minmax(var(--pane-min), var(--left-width)) 4px minmax(420px, 1fr) 4px minmax(var(--pane-min), var(--right-width));
   overflow: hidden;
-  --left-width: 24%;
-  --right-width: 20%;
+  --left-width: 22%;
+  --right-width: 18%;
 }
 
 .three-pane-root[data-right-hidden="true"] {
@@ -668,6 +668,10 @@ textarea:focus-visible,
   margin-left: auto;
 }
 
+.margin-writing-status > .context-help {
+  margin-left: auto;
+}
+
 .context-help > summary,
 .editor-advanced-tools > summary {
   list-style: none;
@@ -976,11 +980,6 @@ textarea:focus-visible,
 
   .app-topbar-document {
     grid-template-columns: auto minmax(220px, 1fr);
-  }
-
-  .app-topbar-document .app-chip {
-    grid-column: 1 / -1;
-    justify-self: start;
   }
 }
 

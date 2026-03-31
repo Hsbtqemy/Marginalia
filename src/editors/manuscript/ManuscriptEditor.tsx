@@ -420,9 +420,11 @@ function ManuscriptToolbar(props: {
         <span className={`margin-status-chip ${currentManuscriptBlockId ? "is-targeting" : ""}`}>
           {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select a passage"}
         </span>
-        <span className="margin-status-chip">Notes: L{linkedLeftCount} R{linkedRightCount}</span>
+        {currentManuscriptBlockId ? (
+          <span className="margin-status-chip">Notes: L{linkedLeftCount} R{linkedRightCount}</span>
+        ) : null}
         <details className="context-help">
-          <summary>Writing help</summary>
+          <summary>Help</summary>
           <div className="context-help-body">
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked note</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G show linked notes</span>

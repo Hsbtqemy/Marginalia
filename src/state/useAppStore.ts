@@ -101,7 +101,7 @@ export const useAppStore = create<AppState>((set) => ({
   presetManagerOpen: false,
   themeMode: "system",
   highContrast: false,
-  paneSizes: { left: 0.24, right: 0.2 },
+  paneSizes: { left: 0.22, right: 0.18 },
   currentManuscriptBlockId: null,
   leftCurrentBlockId: null,
   rightCurrentBlockId: null,

@@ -911,127 +911,127 @@ function MarginToolbar(props: {
           </button>
         </div>
         <div className="toolbar-inline-group">
-          <button
-            className="toolbar-button toolbar-button-compact"
-            type="button"
-            onClick={() =>
-              run((editor) =>
-                editor.dispatchCommand(LINK_CURRENT_MARGINALIA_BLOCK_COMMAND, {
-                  manuscriptBlockId: props.currentManuscriptBlockId,
-                }),
-              )
-            }
-            disabled={!props.currentManuscriptBlockId}
-          >
-            Link to Passage
-          </button>
-          <button className="toolbar-button toolbar-button-compact" type="button" onClick={props.onGoToLinkedManuscript}>
-            Go to Passage
-          </button>
+          <details className="editor-advanced-tools">
+            <summary>Format</summary>
+            <div className="editor-advanced-tools-body">
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.bold ? "true" : "false"}
+                type="button"
+                onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold"))}
+              >
+                Bold
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.italic ? "true" : "false"}
+                type="button"
+                onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic"))}
+              >
+                Italic
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.underline ? "true" : "false"}
+                type="button"
+                onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline"))}
+              >
+                Underline
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "paragraph" ? "true" : "false"}
+                type="button"
+                onClick={() => setBlockType("paragraph")}
+              >
+                Text
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "h1" ? "true" : "false"}
+                type="button"
+                onClick={() => setBlockType("h1")}
+              >
+                H1
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "h2" ? "true" : "false"}
+                type="button"
+                onClick={() => setBlockType("h2")}
+              >
+                H2
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "h3" ? "true" : "false"}
+                type="button"
+                onClick={() => setBlockType("h3")}
+              >
+                H3
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "quote" ? "true" : "false"}
+                type="button"
+                onClick={() => setBlockType("quote")}
+              >
+                Quote
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "bullets" ? "true" : "false"}
+                type="button"
+                onClick={() => run((editor) => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined))}
+              >
+                Bullets
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "numbers" ? "true" : "false"}
+                type="button"
+                onClick={() => run((editor) => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined))}
+              >
+                Numbers
+              </button>
+              <button
+                className="toolbar-button"
+                data-active={props.toolbarState.blockType === "checklist" ? "true" : "false"}
+                type="button"
+                onClick={() => run((editor) => editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined))}
+              >
+                Checklist
+              </button>
+              <button
+                className="toolbar-button"
+                type="button"
+                onClick={() => run((editor) => editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined))}
+              >
+                No List
+              </button>
+            </div>
+          </details>
         </div>
         <details className="editor-advanced-tools">
-          <summary>Format</summary>
+          <summary>Actions</summary>
           <div className="editor-advanced-tools-body">
             <button
-              className="toolbar-button"
-              data-active={props.toolbarState.bold ? "true" : "false"}
+              className="toolbar-button toolbar-button-compact"
               type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold"))}
+              onClick={() =>
+                run((editor) =>
+                  editor.dispatchCommand(LINK_CURRENT_MARGINALIA_BLOCK_COMMAND, {
+                    manuscriptBlockId: props.currentManuscriptBlockId,
+                  }),
+                )
+              }
+              disabled={!props.currentManuscriptBlockId}
             >
-              Bold
+              Link to Passage
             </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.italic ? "true" : "false"}
-              type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic"))}
-            >
-              Italic
+            <button className="toolbar-button toolbar-button-compact" type="button" onClick={props.onGoToLinkedManuscript}>
+              Go to Passage
             </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.underline ? "true" : "false"}
-              type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline"))}
-            >
-              Underline
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "paragraph" ? "true" : "false"}
-              type="button"
-              onClick={() => setBlockType("paragraph")}
-            >
-              Text
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "h1" ? "true" : "false"}
-              type="button"
-              onClick={() => setBlockType("h1")}
-            >
-              H1
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "h2" ? "true" : "false"}
-              type="button"
-              onClick={() => setBlockType("h2")}
-            >
-              H2
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "h3" ? "true" : "false"}
-              type="button"
-              onClick={() => setBlockType("h3")}
-            >
-              H3
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "quote" ? "true" : "false"}
-              type="button"
-              onClick={() => setBlockType("quote")}
-            >
-              Quote
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "bullets" ? "true" : "false"}
-              type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined))}
-            >
-              Bullets
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "numbers" ? "true" : "false"}
-              type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined))}
-            >
-              Numbers
-            </button>
-            <button
-              className="toolbar-button"
-              data-active={props.toolbarState.blockType === "checklist" ? "true" : "false"}
-              type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined))}
-            >
-              Checklist
-            </button>
-            <button
-              className="toolbar-button"
-              type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined))}
-            >
-              No List
-            </button>
-          </div>
-        </details>
-        <details className="editor-advanced-tools">
-          <summary>Note tools</summary>
-          <div className="editor-advanced-tools-body">
             <button
               className="toolbar-button toolbar-button-compact"
               type="button"
@@ -1100,12 +1100,12 @@ function MarginToolbar(props: {
           >
             {props.toolbarState.linkedManuscriptBlockId ? "Linked note" : "Free note"}
           </span>
-          <span className={`margin-status-chip ${props.currentManuscriptBlockId ? "is-targeting" : ""}`}>
-            {props.currentManuscriptBlockId ? "Passage ready" : "Select a passage"}
-          </span>
+          {props.currentManuscriptBlockId ? (
+            <span className="margin-status-chip is-targeting">Passage ready</span>
+          ) : null}
         </div>
         <details className="context-help">
-          <summary>Note shortcuts</summary>
+          <summary>Help</summary>
           <div className="context-help-body">
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked note</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+L link current note</span>
@@ -1175,11 +1175,15 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
     if (!editor) {
       return;
     }
-    editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
-      kind: props.kind,
-      linkedManuscriptBlockId,
-    });
-    editor.focus();
+    try {
+      editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
+        kind: props.kind,
+        linkedManuscriptBlockId,
+      });
+      editor.focus();
+    } catch (error) {
+      console.error("Failed to insert marginalia block", error);
+    }
   };
 
   const focusBlockById = (marginBlockId: string) => {
