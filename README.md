@@ -61,11 +61,21 @@ npm run tauri:build
 
 ```bash
 npm install
-npm run lint:colors
-npm test
-npm run build
-cargo check --manifest-path src-tauri/Cargo.toml
+npm run verify
 ```
+
+`npm run verify` runs:
+
+- `npm run lint:colors`
+- `npm test`
+- `npm run build`
+- `cargo test --manifest-path src-tauri/Cargo.toml`
+- `cargo check --manifest-path src-tauri/Cargo.toml`
+
+If your shell cannot find `npm`, `node`, or `cargo`, open a fresh terminal after installation or fix your `PATH` first. On Windows, the most common locations are:
+
+- `C:\Program Files\nodejs`
+- `%USERPROFILE%\.cargo\bin`
 
 ## Project layout
 
@@ -172,3 +182,4 @@ Security notes:
 
 - This implementation is desktop-first for macOS/Windows/Linux.
 - On Windows, Rust builds also require the MSVC linker from Visual Studio C++ Build Tools.
+- GitHub Actions runs the same verification chain on `windows-latest` via `.github/workflows/verify.yml`.

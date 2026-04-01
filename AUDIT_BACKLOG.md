@@ -1,827 +1,605 @@
 # Backlog executable - Marginalia
 
-Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of done, livrables, risques et dependances.
+Ce backlog couvre le travail actif restant apres l'audit du 2026-04-01.
+Il est volontairement oriente execution: ordre de passage, marquage des urgences, perimetre, definition of done, et verifications.
+
+## Legende
+
+- `[CRITIQUE]`: bloque la securite, la stabilite, ou le fait d'avoir un depot "vert". Aucun nouveau travail produit tant que ces items ne sont pas fermes.
+- `[HAUT]`: gros levier apres stabilisation du socle.
+- `[MOYEN]`: evolution produit/UX a traiter apres fermeture des points critiques.
+- `Statut`: `todo`, `in progress`, `done`, `blocked`.
+
+## Etat actuel
+
+- OK: `npm test`
+- OK: `cargo test --manifest-path src-tauri/Cargo.toml`
+- OK: `npm run build`
+- OK: `cargo check --manifest-path src-tauri/Cargo.toml`
+- OK: `npm run lint:colors`
+- OK: `npm run verify`
+- OK: couverture automatisee etendue sur `queries`, invariants de linking, scheduler `New linked pair` et cleanup pointer global
+- Incident connu: workflow `New linked pair` / `New linked note` encore fragile selon le scenario utilisateur.
+- En cours: resize pointeur des panneaux reactive dans le code, verification manuelle Windows encore a faire.
+- Dette visible: drag pointeur des blocs de marge toujours desactive, en attente d'un ticket dedie.
 
 ## Regles d'execution
 
-- Chaque item doit produire une PR ou un lot de commits autonome.
-- Ne pas melanger hardening, UX et gros refactors dans une meme PR.
-- Toute tache qui touche a l'export ou a la persistance doit inclure des tests.
-- Toute tache qui touche a Tauri doit inclure une verification manuelle Windows au minimum.
-- Tant que l'item `SEC-01` n'est pas traite, eviter d'etendre les usages HTML/libres dans l'app.
+- Tant qu'un item `[CRITIQUE]` est `todo` ou `in progress`, ne pas ouvrir de chantier produit non critique.
+- Toute tache qui touche a Tauri, WebView2, resize, pointer capture ou drag doit inclure une verification manuelle Windows.
+- Toute tache qui touche a la persistance, au linking, aux exports ou au bootstrap doit inclure des tests.
+- Un item = une PR ou une petite stack de PR. Si un item touche plus de 4 a 5 fichiers majeurs, le splitter.
+- A la fermeture d'un item: mettre a jour ce fichier, noter la verification faite, et lier la PR si disponible.
 
-## Vue d'ensemble
+## Ordre d'execution recommande
 
-| ID | Priorite | Theme | Titre | Effort | Risque |
-|---|---|---|---|---|---|
-| SEC-01 | P0 | Securite | Durcir l'aperçu d'impression et la CSP Tauri | M | Eleve |
-| PERF-01 | P0 | Performance | Debouncer la persistance des preferences UI | S | Moyen |
-| REL-01 | P0 | Robustesse | Ajouter une gestion d'erreur utilisateur sur bootstrap/save/export | M | Eleve |
-| DATA-01 | P1 | Donnees | Rendre `createDocument` transactionnel | S | Moyen |
-| SEC-02 | P1 | Securite | Reduire les permissions Tauri au strict necessaire | S | Moyen |
-| DATA-02 | P1 | Donnees | Fiabiliser le systeme de migrations | M | Moyen |
-| QA-01 | P1 | Qualite | Poser un socle de tests automatise | M | Eleve |
-| EXP-01 | P1 | Produit | Documenter explicitement les limites de l'export DOCX | S | Faible |
-| EXP-02 | P2 | Export | Augmenter la fidelite de l'export DOCX | L | Moyen |
-| UX-01 | P2 | UX | Remplacer `prompt/confirm` par des modales natives de l'app | M | Faible |
-| UX-02 | P1 | UX/UI | Recentrer l'app sur l'ecriture | L | Eleve |
-| UX-03 | P1 | UX/UI | Redessiner la marge comme un carnet de notes | L | Eleve |
-| UX-04 | P1 | UX/UI | Reduire le bruit permanent et rendre l'aide contextuelle | M | Moyen |
-| UX-05 | P2 | UX/UI | Installer une direction visuelle editoriale complete | L | Moyen |
-| UX-06 | P2 | UX/UI | Recomposer la topbar et la navigation document | M | Moyen |
-| DX-01 | P2 | DX | Corriger les details de finition du projet | S | Faible |
+1. `CRIT-01`
+2. `CRIT-02`
+3. `CRIT-03`
+4. `QA-01`
+5. `PERF-01`
+6. `ARCH-01`
+7. `EXP-01`
+8. `UX-01`
+9. `UX-02`
+10. `UX-03`
+11. `DX-01`
 
-## Etat d'avancement (2026-04-01)
+## Tableau actif
 
-| ID | Statut |
-|---|---|
-| SEC-01 | done |
-| PERF-01 | done |
-| REL-01 | done |
-| DATA-01 | done |
-| SEC-02 | done |
-| DATA-02 | done |
-| QA-01 | in progress |
-| EXP-01 | done |
-| EXP-02 | todo |
-| UX-01 | done |
-| UX-02 | in progress |
-| UX-03 | in progress |
-| UX-04 | in progress |
-| UX-05 | in progress |
-| UX-06 | in progress |
-| DX-01 | done |
+| ID | Marqueur | Priorite | Theme | Titre | Statut | Effort | Dependances |
+|---|---|---|---|---|---|---|---|
+| CRIT-01 | [CRITIQUE] | P0 | Securite / DX | Remplacer le fallback de boot dangereux et repasser le depot au vert | done | S | - |
+| CRIT-02 | [CRITIQUE] | P0 | Stabilite | Corriger les gels d'interaction lies au pointer capture et reactiver le resize | in progress | M | - |
+| CRIT-03 | [CRITIQUE] | P0 | UX / Stabilite | Stabiliser le workflow `New linked pair` entre manuscrit et marges | in progress | M | CRIT-02 |
+| QA-01 | [HAUT] | P1 | Qualite | Poser une vraie chaine de verification locale + CI | in progress | M | CRIT-01, CRIT-03 |
+| PERF-01 | [HAUT] | P1 | Performance | Supprimer les sync DOM O(n) sur les updates editeur | todo | L | QA-01 |
+| ARCH-01 | [HAUT] | P1 | Architecture | Decouper les gros fichiers oriente orchestration | todo | M | QA-01 |
+| EXP-01 | [MOYEN] | P2 | Produit | Aligner les attentes PDF/DOCX avec les comportements reels | todo | M | QA-01 |
+| UX-01 | [MOYEN] | P2 | UX | Reduire le bruit permanent, simplifier la topbar et l'aide visible | in progress | M | - |
+| UX-02 | [MOYEN] | P2 | UI | Recentrer l'interface sur le manuscrit | in progress | L | UX-01 |
+| UX-03 | [MOYEN] | P2 | UI | Transformer les marges en vrai carnet de notes | in progress | L | UX-02 |
+| UX-04 | [MOYEN] | P2 | UX | Decider et traiter le drag pointeur des blocs de marge | todo | M | CRIT-02 |
+| DX-01 | [MOYEN] | P2 | DX | Ajouter une commande unique de verification et une doc contributeur simple | done | S | QA-01 |
 
-### Resume
+## Items critiques
 
-- done: 8
-- in progress: 6
-- todo: 1
-- hors backlog initial (critique): stabilite UX autour de `New linked note` (plantage/interactions gelees selon scenario utilisateur)
-
-### Reste a faire priorise
-
-1. `QA-01`: finaliser le socle de tests (renforcer surtout la couverture DB/queries et scenarios UI critiques).
-2. `UX-02`, `UX-03`, `UX-04`, `UX-06`: terminer la passe writer-first (hierarchie manuscrit, marge carnet, densite d'aides, topbar).
-3. `UX-05`: finaliser la signature visuelle editoriale (coherence globale + captures avant/apres).
-4. `EXP-02`: phase export DOCX fidelity apres stabilisation UX/QA.
-
----
-
-## P0 - A traiter d'abord
-
-### SEC-01 - Durcir l'aperçu d'impression et la CSP Tauri
+### CRIT-01 - Remplacer le fallback de boot dangereux et repasser le depot au vert
 
 **Pourquoi**
 
-- L'app injecte du HTML dans `iframe.srcDoc`.
-- La CSP Tauri est desactivee.
-- C'est la zone la plus sensible du projet.
+- Le fallback de demarrage injecte une chaine HTML via `innerHTML`.
+- Ce fallback contient des styles inline et des couleurs hardcodees.
+- C'est a la fois un sujet de securite de base et la cause directe du `lint:colors` rouge.
 
-**Objectif**
+**Perimetre**
 
-- Empêcher toute execution de script non desiree dans l'aperçu.
-- Garder l'aperçu imprimeable sans ouvrir une breche inutile.
+- `src/main.tsx`
+- `src/theme/tokens.css`
+- eventuellement un composant/fichier de fallback dedie si besoin
 
 **Travaux**
 
-1. Recenser exactement ce que `manuscriptHtml` peut contenir apres sortie Lexical.
-2. Introduire une sanitization explicite avant injection dans l'aperçu.
-3. Restreindre l'HTML de preview a une liste de tags/attributs autorises.
-4. Retablir une CSP Tauri stricte et tester l'aperçu avec cette CSP.
-5. Verifier que l'impression PDF continue de fonctionner sur Windows.
+1. Remplacer le rendu par string HTML par un rendu DOM sur ou par un composant React de fallback.
+2. Rendre le message d'erreur comme texte, jamais comme HTML interprete.
+3. Supprimer les styles inline et passer par les tokens / classes CSS.
+4. Verifier qu'aucune nouvelle exception de boot ne casse le fallback lui-meme.
+5. Repasser `npm run lint:colors` au vert.
 
 **Definition of done**
 
-- `src-tauri/tauri.conf.json` n'utilise plus `csp: null`.
-- L'aperçu d'impression n'accepte plus d'HTML arbitraire non filtre.
-- Un test couvre au moins un cas de contenu dangereux neutralise.
-- Une note dans le README explique l'approche retenue.
+- `src/main.tsx` n'utilise plus `innerHTML` pour afficher les erreurs de demarrage.
+- Aucune couleur inline ou litterale hors `src/theme/tokens.css`.
+- Le message d'erreur reste lisible et ne peut pas injecter de markup.
+- Le depot est vert sur `lint:colors`, `test`, `build`.
 
-**Livrables**
+**Verification**
 
-- Hardening preview.
-- CSP active.
-- Test(s) et doc.
+- `npm run lint:colors`
+- `npm test`
+- `npm run build`
+- verifier manuellement un plantage de boot simule et lire le fallback affiche
 
-**Dependances**
+**Sortie attendue**
 
-- Aucune.
+- PR courte, autonome, mergeable seule.
+
+**Statut**
+
+- done le 2026-04-01
+- verification executee:
+  - `npm run lint:colors`
+  - `npm test`
+  - `npm run build`
 
 ---
 
-### PERF-01 - Debouncer la persistance des preferences UI
+### CRIT-02 - Corriger les gels d'interaction lies au pointer capture et reactiver le resize
 
 **Pourquoi**
 
-- Les tailles de panneaux sont sauvees a chaque mouvement de pointeur.
-- Cela peut multiplier les ecritures disque et degrader la fluidite.
+- Le resize pointeur des panneaux est desactive.
+- Le drag pointeur des blocs de marge est desactive.
+- Le code indique explicitement qu'il existe des gels d'input sur certaines configurations Windows/WebView.
 
-**Objectif**
+**Perimetre**
 
-- Persister l'etat UI sans ecriture aggressive.
+- `src/app/layout/ThreePaneLayout.tsx`
+- `src/editors/margin/MarginEditorBase.tsx`
+- `src/app/App.tsx` si la logique globale de release doit etre renforcee
 
 **Travaux**
 
-1. Differencier mise a jour en memoire et persistance disque.
-2. Sauver `paneSizes` a la fin du drag, ou avec un debounce raisonnable.
-3. Verifier si `themeMode`, `highContrast`, `pagePreview`, `rightPaneVisible` doivent rester en sauvegarde immediate.
-4. Ajouter un garde-fou pour eviter les `save()` concurrents/redundants.
+1. Ecrire une matrice de reproduction Windows: resize gauche, resize droite, alt-tab, blur de fenetre, escape, drag rapide.
+2. Isoler le ou les scenarios qui laissent un curseur bloque ou des clics inertes.
+3. Corriger la logique de cleanup `pointerup` / `pointercancel` / `lostpointercapture` / `blur`.
+4. Reactiver `ENABLE_POINTER_RESIZE`.
+5. Soit reactiver le drag pointeur des blocs avec garanties, soit supprimer le chemin mort et ouvrir un item separe.
 
 **Definition of done**
 
-- Le resize reste fluide.
-- Les preferences sont bien restaurees au redemarrage.
-- Les ecritures de preferences sont reduites de maniere evidente.
+- Plus aucun etat "clics bloques" apres resize.
+- Le curseur revient toujours a l'etat normal.
+- Le resize pointeur est reactive et stable.
+- Le code ne contient plus de feature critique desactivee sans plan clair.
 
-**Livrables**
+**Verification**
 
-- Refactor de la persistance UI.
-- Test manuel documente.
+- verification manuelle Windows obligatoire
+- scenario 1: resize gauche puis relacher hors fenetre
+- scenario 2: resize droite puis alt-tab
+- scenario 3: resize, escape, blur, retour fenetre
+- scenario 4: changer de document apres resize
+- `npm test`
+- `npm run build`
 
-**Dependances**
+**Sortie attendue**
 
-- Aucune.
+- PR de stabilite uniquement, sans retouche visuelle annexe.
+
+**Statut**
+
+- in progress le 2026-04-01
+- fait:
+  - cleanup de resize renforce
+  - resize pointeur reactive
+  - garde-fou global de release aligne sur les captures actives
+  - helper `releaseStuckPointerState` extrait et teste en `jsdom`
+- reste a faire:
+  - verification manuelle Windows
+  - statuer explicitement sur le drag pointeur des blocs de marge
 
 ---
 
-### REL-01 - Ajouter une gestion d'erreur utilisateur sur bootstrap/save/export
+### CRIT-03 - Stabiliser le workflow `New linked pair`
 
 **Pourquoi**
 
-- Les erreurs critiques remontent surtout en crash ou en rejection non geree.
-- L'utilisateur n'a pas de voie claire pour comprendre ou recuperer.
+- C'est un parcours coeur produit.
+- Il existe un incident connu autour de `New linked note` / `New linked pair`.
+- Le flux actuel depend d'un enchainement de focus + `setTimeout`, donc potentiellement race-prone.
 
-**Objectif**
+**Perimetre**
 
-- Remplacer l'echec brutal par une UX de recuperation ou, au minimum, un message clair.
+- `src/app/App.tsx`
+- `src/editors/manuscript/ManuscriptEditor.tsx`
+- `src/editors/margin/MarginEditorBase.tsx`
+- `src/editors/manuscript/lexicalBlocks/*`
+- tests TypeScript cibles
 
 **Travaux**
 
-1. Entourer le bootstrap DB/store d'un `try/catch` avec etat d'erreur visible.
-2. Gerer les echecs de sauvegarde manuscrit/marges/presets.
-3. Gerer les echecs de `pick_save_path` et `export_docx` avec feedback utilisateur.
-4. Definir un composant simple de message d'erreur ou banniere d'etat.
-5. Journaliser les erreurs de maniere exploitable.
+1. Documenter les scenarios de repro:
+   - depuis une selection manuscrit existante
+   - sans block cible courant
+   - apres changement de document
+   - avec panneau droit masque
+   - via toolbar, via palette, via raccourci clavier
+2. Remplacer si possible l'orchestration basee sur `setTimeout` par une sequence plus deterministe.
+3. Verifier qu'un block manuscrit est toujours cree ou reuse une seule fois.
+4. Verifier qu'une note liee est toujours creee au bon endroit, avec bon focus, sans doublon ni freeze.
+5. Ajouter une couverture de test sur les utilitaires de block id et les invariants de linking.
 
 **Definition of done**
 
-- Un echec DB au demarrage affiche un etat comprehensible.
-- Un echec d'export n'entraine pas un silence ou un crash.
-- Les erreurs importantes sont logguees.
+- Le parcours `New linked pair` ne gele plus l'interface.
+- Pas de doublon de passage ou de note.
+- Le focus final est previsible.
+- Les invariants de linking critiques sont testes.
 
-**Livrables**
+**Verification**
 
-- Etats d'erreur UI.
-- Logging minimum.
-- Scenarios manuels de verification.
+- verification manuelle Windows
+- verification manuelle macOS/Linux si disponibles
+- `npm test`
+- `npm run build`
 
-**Dependances**
+**Sortie attendue**
 
-- Aucune.
+- PR centree sur le flux lie, sans redesign de toolbar.
 
----
+**Statut**
 
-## P1 - Stabilisation
+- in progress le 2026-04-01
+- fait:
+  - creation liee serialisee via un timer unique
+  - annulation des creations en attente au changement de document et a l'unmount
+  - garde-fou sur l'ID de document courant avant execution
+  - orchestration extraite dans un scheduler dedie et testable
+  - tests ajoutes sur remplacement de requete en attente, changement de document et remontée d'erreur
+- reste a faire:
+  - verification manuelle des scenarios de repro
+  - confirmer qu'il n'y a plus de doublon ni de freeze sur parcours reel
 
-### DATA-01 - Rendre `createDocument` transactionnel
+## Stabilisation du socle
 
-**Pourquoi**
-
-- La creation de document effectue plusieurs operations separees.
-- Un echec intermediaire peut laisser la base dans un etat partiel.
-
-**Objectif**
-
-- Garantir l'atomicite de la creation d'un document.
-
-**Travaux**
-
-1. Mettre `documents`, `manuscript_states`, `margin_left_states`, `margin_right_states`, `document_export_settings` dans une meme transaction.
-2. Definir clairement ce qui se passe si les presets builtin n'existent pas encore.
-3. Ajouter un test de non-regression.
-
-**Definition of done**
-
-- Soit le document est entierement cree, soit rien n'est persiste.
-- Un test couvre l'invariant transactionnel.
-
-**Dependances**
-
-- Peut etre traite avant ou apres `DATA-02`.
-
----
-
-### SEC-02 - Reduire les permissions Tauri au strict necessaire
+### QA-01 - Poser une vraie chaine de verification locale + CI
 
 **Pourquoi**
 
-- Les permissions `fs` et clipboard paraissent plus larges que l'usage visible.
-- Le principe du moindre privilege n'est pas respecte.
+- Le depot a deja des tests utiles, mais pas encore de chaine unifiee ni de CI visible.
+- Les zones les plus sensibles ne sont pas encore assez couvertes.
 
-**Objectif**
+**Perimetre**
 
-- Conserver uniquement les permissions justifiees par le produit.
-
-**Travaux**
-
-1. Inventorier les plugins reellement utilises cote frontend et Rust.
-2. Retirer les permissions non utilisees.
-3. Remplacer les permissions globales par des permissions plus specifiques si possible.
-4. Verifier qu'export, store, SQL et impression fonctionnent encore.
-
-**Definition of done**
-
-- Chaque permission restante est justifiee.
-- Aucune fonctionnalite existante n'est regressionnee.
-
-**Dependances**
-
-- Aucune, mais a recouper avec `SEC-01`.
-
----
-
-### DATA-02 - Fiabiliser le systeme de migrations
-
-**Pourquoi**
-
-- Le decoupage SQL par `;` ne passera pas a l'echelle.
-
-**Objectif**
-
-- Eviter qu'une future migration casse pour une raison purement technique.
+- `package.json`
+- `.github/workflows/*` si GitHub est la forge cible
+- `scripts/*`
+- tests TypeScript dans `src/**`
+- tests Rust dans `src-tauri/src/lib.rs` ou modules extraits
 
 **Travaux**
 
-1. Choisir une strategie:
-   - executeur capable de prendre un script SQL complet;
-   - format de migration plus simple;
-   - ou migrations codees si le plugin l'impose.
-2. Documenter les contraintes de format.
-3. Ajouter un test sur au moins une migration representative.
-
-**Definition of done**
-
-- Le moteur de migration ne depend plus d'un split naif sur `;`, ou cette contrainte est explicitement verrouillee et testee.
-
-**Dependances**
-
-- Aucune.
-
----
-
-### QA-01 - Poser un socle de tests automatise
-
-**Pourquoi**
-
-- Aujourd'hui, aucun filet de securite reel.
-
-**Objectif**
-
-- Couvrir d'abord les zones a fort risque et forte valeur.
-
-**Travaux**
-
-1. Definir la pile de tests TypeScript.
-2. Ajouter des tests sur:
+1. Ajouter une commande unique, par exemple `npm run verify`, qui lance au minimum:
+   - `npm run lint:colors`
+   - `npm test`
+   - `npm run build`
+   - `cargo test --manifest-path src-tauri/Cargo.toml`
+   - `cargo check --manifest-path src-tauri/Cargo.toml`
+2. Ajouter une CI qui execute la meme chaine.
+3. Etendre les tests sur:
    - `src/db/queries.ts`
-   - `src/db/db.ts`
-   - `src/editors/margin/marginaliaBlocks/indexing.ts`
-   - `src/utils/printPreview.ts`
-3. Ajouter des tests Rust sur le parsing/export:
-   - `parse_manuscript_blocks`
-   - `parse_margin_blocks`
-   - regroupement comments/footnotes
-4. Ajouter un script de CI local simple dans `package.json` et/ou documentation.
+   - invariants de linking
+   - fallback de boot si extrait
+   - regression de sanitization / print preview
+4. Documenter la verification locale dans le README.
 
 **Definition of done**
 
-- Une commande de tests existe.
-- Les zones critiques ont une couverture initiale.
-- Les tests sont assez rapides pour etre lances avant merge.
+- Une seule commande locale permet de verifier le projet.
+- Une CI echoue si lint/tests/build/check cassent.
+- Les flux critiques ont une couverture initiale suffisante.
 
-**Dependances**
+**Verification**
 
-- Facilite tous les autres items.
+- lancer la commande unique locale
+- verifier un run CI vert sur une branche de test
+
+**Statut**
+
+- in progress le 2026-04-01
+- fait:
+  - `npm run verify` ajoute
+  - workflow GitHub Actions `verify.yml` ajoute
+  - README aligne sur la nouvelle chaine de verification
+  - tests ajoutes sur `src/db/queries.ts`
+  - tests ajoutes sur les invariants de linking critiques
+  - tests ajoutes sur le scheduler `New linked pair`
+  - tests ajoutes sur le cleanup pointer global
+- reste a faire:
+  - verifier un run CI vert sur GitHub Actions
 
 ---
 
-### EXP-01 - Documenter explicitement les limites de l'export DOCX
+### PERF-01 - Supprimer les sync DOM O(n) sur les updates editeur
 
 **Pourquoi**
 
-- L'export actuel est utile, mais pas fidele a tout ce que l'editeur permet.
+- Plusieurs plugins balayent tout ou partie du DOM a chaque update.
+- Sur gros documents, ce sera un plafond de performance avant meme les nouvelles features.
 
-**Objectif**
+**Perimetre**
 
-- Aligner les attentes utilisateur avec le comportement reel.
+- `src/editors/manuscript/lexicalBlocks/BlockIdPlugin.tsx`
+- `src/editors/manuscript/ManuscriptEditor.tsx`
+- `src/editors/margin/MarginEditorBase.tsx`
+- eventuels helpers de sync DOM / indexes
 
 **Travaux**
 
-1. Ajouter dans le README ce qui est preserve par l'export.
-2. Ajouter ce qui n'est pas encore preserve.
-3. Expliquer la difference entre profil `Clean` et `Working`.
+1. Profiler les updates sur un document long de reference.
+2. Identifier les sync full-scan a remplacer:
+   - rebinding des `data-manuscript-block-id`
+   - sync preview des notes liees
+   - sync des compteurs / etats de blocks
+3. Passer a une strategie incrementale ou event-driven.
+4. Ajouter au moins un scenario de non-regression "gros document".
 
 **Definition of done**
 
-- Le README permet a un utilisateur de savoir a quoi s'attendre avant export.
+- Plus de scan global systematique a chaque frappe sur les chemins critiques.
+- Pas de lag visible sur un document de reference long.
+- Les attributs DOM utiles restent coherents.
 
-**Dependances**
+**Verification**
 
-- Aucune.
-
----
-
-## P2 - Evolution produit et finition
-
-### EXP-02 - Augmenter la fidelite de l'export DOCX
-
-**Pourquoi**
-
-- Le produit gagnera en valeur si le DOCX ressemble davantage au manuscrit.
-
-**Objectif**
-
-- Ameliorer la restitution semantique et visuelle sans casser la robustesse.
-
-**Pistes**
-
-1. Support des styles inline essentiels.
-2. Meilleure gestion des listes.
-3. Gestion des liens si pertinents.
-4. Preservation plus fine des retours ligne et blocs vides.
-5. Strategie plus propre pour commentaires multiples et notes de bas de page.
-
-**Definition of done**
-
-- Une matrice "editeur -> DOCX" existe.
-- Les comportements supportes sont testes.
-
-**Dependances**
-
-- Idealement apres `QA-01`.
+- `npm test`
+- `npm run build`
+- scenario manuel avec document long
 
 ---
 
-### UX-01 - Remplacer `prompt/confirm` par des modales natives de l'app
+### ARCH-01 - Decouper les gros fichiers d'orchestration
 
 **Pourquoi**
 
-- Les dialogues navigateur cassent l'homogeneite UX.
+- `App.tsx`, `MarginEditorBase.tsx` et `src-tauri/src/lib.rs` concentrent trop de responsabilites.
+- Cela ralentit les modifs et augmente le risque de regression.
 
-**Objectif**
+**Perimetre**
 
-- Offrir une UX coherente avec le reste du produit.
+- `src/app/App.tsx`
+- `src/editors/margin/MarginEditorBase.tsx`
+- `src-tauri/src/lib.rs`
 
 **Travaux**
 
-1. Creer une modale de renommage.
-2. Creer une modale de confirmation de suppression.
-3. Ajouter gestion clavier, focus, fermeture et etat d'erreur.
+1. Extraire du frontend:
+   - bootstrap / load document
+   - export / print preview
+   - menus / palette / dialogs
+2. Extraire de l'editeur de marge:
+   - toolbar
+   - bridge plugin
+   - drag / pointer logic
+3. Extraire du Rust:
+   - parsing Lexical
+   - construction DOCX
+   - commandes Tauri
 
 **Definition of done**
 
-- Plus aucun `window.prompt` ni `window.confirm`.
-- Le focus est maitrise et accessible.
+- Les responsabilites sont separees.
+- Les fichiers critiques deviennent lisibles et localisables.
+- Les tests restent verts apres extraction.
 
-**Dependances**
+**Verification**
 
-- Peut reutiliser le pattern du `PresetManager`.
+- `npm test`
+- `npm run build`
+- `cargo test --manifest-path src-tauri/Cargo.toml`
+- `cargo check --manifest-path src-tauri/Cargo.toml`
 
----
+## Produit et UX
 
-### UX-02 - Recentrer l'app sur l'ecriture
+### EXP-01 - Aligner les attentes PDF/DOCX avec les comportements reels
 
 **Pourquoi**
 
-- Le manuscrit n'est pas encore la zone dominante de l'interface.
-- L'app ressemble davantage a un outil de debug/edition qu'a un environnement d'ecriture.
+- Le PDF/print preview et le DOCX n'offrent pas la meme profondeur fonctionnelle.
+- Il faut soit aligner l'UI et la doc, soit preparer une vraie parite.
 
-**Objectif**
+**Perimetre**
 
-- Faire du texte l'element visuel principal, avec une vraie colonne d'ecriture et une hierarchie claire.
+- `README.md`
+- labels UI dans `src/app/App.tsx` et menus
+- backlog export si une phase 2 est ouverte
 
 **Travaux**
 
-1. Redefinir la hierarchie des surfaces: manuscrit premier plan, outils second plan, aides troisieme plan.
-2. Donner au centre une vraie largeur editoriale stable, meme hors mode page preview.
-3. Revoir les espacements, marges et hauteurs de lignes pour obtenir un rythme de lecture/ecriture plus calme.
-4. Diminuer le contraste et la masse visuelle des toolbars par rapport au texte.
-5. Verifier que la vue par defaut est accueillante sur document vide comme sur document long.
+1. Ecrire une matrice de comportement:
+   - manuscrit
+   - notes gauche liees
+   - notes droite liees
+   - notes non liees
+   - styles inline
+2. Clarifier dans l'UI ce que fait reellement `Page Preview`.
+3. Clarifier ce que fait le profil DOCX `clean` vs `working`.
+4. Ouvrir ensuite, si necessaire, une phase 2 export avec vrais deltas fonctionnels.
 
 **Definition of done**
 
-- Au premier regard, le manuscrit domine clairement l'ecran.
-- Le centre ne ressemble plus a un panneau d'outil sombre.
-- La zone de texte garde une largeur et une respiration coherentes en desktop.
+- Un utilisateur comprend sans surprise ce que sort chaque export.
+- L'UI et la doc racontent la meme chose.
 
-**Livrables**
+**Verification**
 
-- Refonte des surfaces du centre.
-- Ajustements CSS de hierarchie et de rythme.
-- Validation visuelle sur ecran vide et ecran rempli.
-
-**Dependances**
-
-- A traiter avant `UX-05`.
+- relire README + menus + boutons
+- export manuel d'un document de reference
 
 ---
 
-### UX-03 - Redessiner la marge comme un carnet de notes
+### UX-01 - Reduire le bruit permanent, simplifier la topbar et l'aide visible
 
 **Pourquoi**
 
-- La marge gauche fonctionne, mais son langage visuel actuel est celui d'une toolbar geante.
-- Elle ne valorise pas assez les notes elles-memes ni leur relation avec le manuscrit.
+- L'interface reste chargee en chips, aide clavier et actions de meme niveau.
+- Le haut de page et les toolbars prennent trop de poids par rapport au texte.
 
-**Objectif**
+**Perimetre**
 
-- Faire de la marge un espace de pensee lisible, agreable et oriente contenu.
+- `src/app/App.tsx`
+- `src/app/CommandPalette.tsx`
+- `src/editors/manuscript/ManuscriptEditor.tsx`
+- `src/editors/margin/MarginEditorBase.tsx`
+- styles associes
 
 **Travaux**
 
-1. Passer d'une grille d'actions permanente a une presentation d'abord centree sur les blocs de notes.
-2. Grouper les actions par niveau: creation, liaison, structure, danger.
-3. Rendre les metadonnees de note plus discretes et plus editoriales.
-4. Mieux mettre en scene l'extrait du passage lie et l'etat de liaison.
-5. Introduire des actions secondaires en hover, menu contextuel ou palette si necessaire.
+1. Limiter les informations toujours visibles a ce qui aide immediatement l'ecriture.
+2. Replier les raccourcis dans une aide contextuelle ou dans la palette.
+3. Simplifier la topbar: document, export, vue, actions rapides.
+4. Reduire la masse visuelle des toolbars.
 
 **Definition of done**
 
-- La marge ressemble a un carnet annexe, pas a un panneau de commandes.
-- Les notes sont plus lisibles que les boutons.
-- Les actions critiques restent accessibles sans saturer la vue.
-
-**Livrables**
-
-- Recomposition de la marge.
-- Etats de note plus lisibles.
-- Strategie d'actions secondaires documentee.
-
-**Dependances**
-
-- Idealement apres `UX-02`.
+- L'ecran par defaut contient moins de bruit UI.
+- Le texte et les notes reprennent la priorite visuelle.
+- Les raccourcis restent decouvrables.
 
 ---
 
-### UX-04 - Reduire le bruit permanent et rendre l'aide contextuelle
+### UX-02 - Recentrer l'interface sur le manuscrit
 
 **Pourquoi**
 
-- Les chips d'etat, aides clavier et messages permanents prennent trop de place.
-- Une vraie app d'ecriture cache la complexite tant qu'elle n'est pas utile.
+- Le centre doit devenir la vraie colonne editoriale du produit.
 
-**Objectif**
+**Perimetre**
 
-- Garder l'aide disponible sans la laisser concurrencer le contenu.
+- layout central
+- densite, largeur, rythme, hierarchie typo
 
 **Travaux**
 
-1. Identifier tout ce qui peut passer de "toujours visible" a "sur demande" ou "selon le focus".
-2. Replier les raccourcis dans une aide contextuelle, un tiroir, un popover ou la palette.
-3. Simplifier les bandeaux de statut manuscrit/marges a 1 ou 2 informations prioritaires.
-4. Reduire la densite des chips et harmoniser leur usage.
-5. Verifier que les raccourcis restent decouvrables pour un nouvel utilisateur.
+1. Donner au manuscrit une largeur stable et editoriale.
+2. Faire passer les outils au second plan.
+3. Valider l'ecran vide et l'ecran long.
 
 **Definition of done**
 
-- L'ecran par defaut contient nettement moins de micro-elements.
-- Les aides clavier ne saturent plus la zone de travail.
-- Les statuts restants ont une utilite immediate.
-
-**Livrables**
-
-- Inventaire des aides permanentes.
-- Refonte des statuts et aides contextuelles.
-- Verification avec document vide et document annote.
-
-**Dependances**
-
-- Se traite en parallele de `UX-02` et `UX-03`.
+- Le manuscrit domine clairement l'ecran.
+- L'app ressemble d'abord a un outil d'ecriture, pas a un panneau d'admin.
 
 ---
 
-### UX-05 - Installer une direction visuelle editoriale complete
+### UX-03 - Transformer les marges en vrai carnet de notes
 
 **Pourquoi**
 
-- L'app est encore dans une esthetique "dark utility" generique.
-- Elle a besoin d'une identite visuelle qui soutienne son concept de manuscrit annote.
+- Les marges doivent valoriser les notes avant les commandes.
 
-**Objectif**
+**Perimetre**
 
-- Poser une direction visuelle nette: atelier d'auteur, bureau editorial, ou carnet critique.
+- `src/editors/margin/*`
+- styles et hierarchie visuelle des blocs
 
 **Travaux**
 
-1. Choisir un axe visuel explicite et en deduire tokens, contrastes, surfaces et typographies.
-2. Revoir la palette, les bordures, les elevations et les separations.
-3. Renforcer la hierarchie typographique entre titre de document, texte, notes et UI secondaire.
-4. Soigner les etats vides, la vue document rempli, et le mode page preview.
-5. Verifier coherence desktop, contraste et accessibilite.
+1. Faire des blocs de notes l'unite principale visible.
+2. Passer les actions secondaires hors de la vue primaire si possible.
+3. Mieux mettre en scene l'etat lie / non lie et l'extrait de passage.
 
 **Definition of done**
 
-- Le produit a une signature visuelle identifiable.
-- Les surfaces et typographies servent l'ecriture au lieu de rappeler un panneau d'admin.
-- La coherence est visible entre topbar, manuscrit, marges et modales.
-
-**Livrables**
-
-- Direction visuelle formalisee.
-- Mise a jour des tokens et composants principaux.
-- Captures avant/apres.
-
-**Dependances**
-
-- A mener apres `UX-02`.
+- La marge evoque un carnet de notes, pas une grosse toolbar.
+- Les notes sont plus lisibles que les controles.
 
 ---
 
-### UX-06 - Recomposer la topbar et la navigation document
+### UX-04 - Decider et traiter le drag pointeur des blocs de marge
 
 **Pourquoi**
 
-- La topbar prend beaucoup de place et presente trop d'actions de meme niveau.
-- Le document et son contexte ne sont pas assez valorises.
+- Le reordonnancement clavier existe, mais le drag pointeur de blocs est encore desactive.
+- Il faut decider clairement si cette interaction fait partie du produit stable ou non.
 
-**Objectif**
+**Perimetre**
 
-- Faire de la topbar un cadre discret et efficace pour naviguer, non une barre de controle dominante.
+- `src/editors/margin/MarginEditorBase.tsx`
+- tests et documentation UX si le drag est retenu
 
 **Travaux**
 
-1. Rehierarchiser les actions topbar: document, export, vue, quick actions.
-2. Simplifier la presentation du select document et du preset actif.
-3. Clarifier ce qui doit vivre dans le menu natif, la topbar ou la palette.
-4. Revoir les tailles de boutons, espacements et alignements.
-5. Verifier la lisibilite sur petites largeurs desktop.
+1. Decider si le drag pointeur doit faire partie du parcours standard.
+2. Si oui, le stabiliser et le tester manuellement sur Windows.
+3. Si non, retirer le chemin mort et assumer le reordonnancement clavier / commandes.
 
 **Definition of done**
 
-- La topbar parait plus legere.
-- Les actions frequentes sont evidentes sans surcharger le haut de page.
-- Le nom du document et son contexte gagnent en importance.
+- Le produit a une position claire sur le reorder pointeur.
+- Le code ne garde plus de feature dormante sans statut explicite.
 
-**Livrables**
+## DX
 
-- Nouvelle hierarchie topbar.
-- Rationalisation des actions visibles.
-- Verification responsive desktop.
-
-**Dependances**
-
-- Peut demarrer en parallele de `UX-02`.
-
----
-
-### DX-01 - Corriger les details de finition du projet
+### DX-01 - Ajouter une commande unique de verification et une doc contributeur simple
 
 **Pourquoi**
 
-- Quelques details donnent une impression de template ou d'etat intermediaire.
+- Le projet est deja verifiable localement, mais pas encore via une entree unique.
+
+**Perimetre**
+
+- `package.json`
+- `README.md`
+- eventuellement `scripts/verify.*`
 
 **Travaux**
 
-1. Remplacer le titre HTML par le vrai nom du produit.
-2. Verifier les libelles visibles et la coherence typographique.
-3. Ajouter une section README "verifications locales" avec commandes attendues.
-4. Verifier que les prerequis `node`, `npm`, `cargo` sont clairement decrits.
+1. Ajouter `npm run verify`.
+2. Documenter prerequis exacts `node`, `npm`, `cargo`.
+3. Documenter le cas Windows si `PATH` n'est pas correctement initialise.
 
 **Definition of done**
 
-- Le depot ne contient plus de trace evidente du template initial.
+- Un nouveau contributeur sait lancer le projet et la verification sans ambiguite.
 
-**Dependances**
+**Statut**
 
-- Aucune.
+- done le 2026-04-01
+- fait:
+  - `npm run verify` ajoute dans `package.json`
+  - README mis a jour avec prerequis et note `PATH` Windows
 
----
+## Archive - deja traite ou clos
 
-## Sprint recommande
+Ces items ne sont pas prioritaires a rouvrir sauf regression constatee.
 
-### Sprint 1
+- `SEC-01` - hardening print preview / CSP: done
+- `PERF-legacy-01` - debounce de la persistance UI: done
+- `REL-01` - gestion d'erreur utilisateur bootstrap/save/export: done
+- `DATA-01` - creation de document transactionnelle: done
+- `SEC-02` - permissions Tauri reduites: done
+- `DATA-02` - fiabilisation migrations: done
+- `EXP-doc-01` - limites DOCX documentees: done
+- `UX-legacy-01` - dialogues natifs app au lieu de `prompt/confirm`: done
+- `DX-legacy-01` - details de finition de base: done
 
-- `SEC-01`
-- `PERF-01`
-- `REL-01`
+## Lots recommandes
+
+### Lot 1 - Fermer les urgences
+
+- `CRIT-01`
+- `CRIT-02`
+- `CRIT-03`
 
 **But**
 
-- Fermer les plus gros risques sans changer le scope produit.
+- remettre le depot propre et stabiliser le coeur de l'interaction
 
-### Sprint 2
+### Lot 2 - Poser le filet de securite
 
-- `DATA-01`
-- `SEC-02`
 - `QA-01`
-- `EXP-01`
-
-**But**
-
-- Rendre le socle fiable et auditable.
-
-### Sprint 3
-
-- `DATA-02`
-- `UX-01`
 - `DX-01`
 
 **But**
 
-- Ameliorer la qualite de vie du projet et preparer les evolutions.
+- rendre chaque futur chantier verifiable et audit-able
 
-### Sprint 4+
+### Lot 3 - Enlever les plafonds techniques
 
-- `EXP-02`
+- `PERF-01`
+- `ARCH-01`
 
 **But**
 
-- Monter en valeur produit sur l'export sans sacrifier la stabilite.
+- reduire le risque de regression et preparer la suite
 
-### Sprint 5
+### Lot 4 - Reprendre la promesse produit
 
+- `EXP-01`
+- `UX-01`
 - `UX-02`
-- `UX-04`
-- `UX-06`
-
-**But**
-
-- Recentrer l'application sur l'ecriture et faire disparaitre le bruit de prototype.
-
-### Sprint 6
-
 - `UX-03`
-- `UX-05`
 
 **But**
 
-- Donner a Marginalia une vraie presence d'app d'ecriture, coherente avec sa promesse editoriale.
-
----
-
-## Tickets prets a ouvrir
-
-### Ticket 1
-
-**Titre**
-
-- Hardening de l'aperçu d'impression et reactivation de la CSP
-
-**Checklist**
-
-- [ ] Sanitizer HTML defini
-- [ ] Injection `srcDoc` securisee
-- [ ] CSP Tauri active
-- [ ] Test de contenu hostile
-- [ ] Verification manuelle impression Windows
-
-### Ticket 2
-
-**Titre**
-
-- Debounce de la persistance des preferences UI
-
-**Checklist**
-
-- [ ] `paneSizes` persiste seulement en fin d'interaction ou debounce
-- [ ] Pas de lag perceptible au resize
-- [ ] Restore OK au redemarrage
-
-### Ticket 3
-
-**Titre**
-
-- Gestion d'erreur utilisateur sur bootstrap et export
-
-**Checklist**
-
-- [ ] Ecran/etat d'erreur demarrage
-- [ ] Feedback erreur export
-- [ ] Logs minimum
-
-### Ticket 4
-
-**Titre**
-
-- Transactions sur la creation de document
-
-**Checklist**
-
-- [ ] Creation atomique
-- [ ] Test de non-regression
-
-### Ticket 5
-
-**Titre**
-
-- Reduction des permissions Tauri
-
-**Checklist**
-
-- [ ] Inventaire usages plugins
-- [ ] Permissions inutiles retirees
-- [ ] Smoke test fonctionnel
-
-### Ticket 6
-
-**Titre**
-
-- Mise en place du socle de tests TS/Rust
-
-**Checklist**
-
-- [ ] Strategie test TS choisie
-- [ ] Tests DB minimum
-- [ ] Tests export Rust minimum
-- [ ] Commande documentee
-
-### Ticket 7
-
-**Titre**
-
-- Recentrer Marginalia sur le manuscrit
-
-**Checklist**
-
-- [ ] Colonne de manuscrit plus editoriale
-- [ ] Hierarchie visuelle recentree sur le texte
-- [ ] Toolbars declasses visuellement
-- [ ] Validation ecran vide / ecran rempli
-
-### Ticket 8
-
-**Titre**
-
-- Transformer la marge en carnet de notes
-
-**Checklist**
-
-- [ ] Actions moins dominantes
-- [ ] Blocs de notes plus lisibles
-- [ ] Etats de liaison mieux mis en scene
-- [ ] Actions secondaires deplacees hors de la vue primaire
-
-### Ticket 9
-
-**Titre**
-
-- Nettoyer les aides permanentes et rendre l'aide contextuelle
-
-**Checklist**
-
-- [ ] Raccourcis permanents audites
-- [ ] Statuts simplifies
-- [ ] Aide contextuelle ou repliable
-- [ ] Verification de la decouvrabilite
-
-### Ticket 10
-
-**Titre**
-
-- Poser une direction visuelle editoriale complete
-
-**Checklist**
-
-- [ ] Axe visuel choisi
-- [ ] Tokens et surfaces revisites
-- [ ] Hierarchie typo renforcee
-- [ ] Captures avant/apres
-
----
-
-## Plan d'action design
-
-### Phase 1 - Desencombrer
-
-1. Faire un inventaire de tous les elements visibles en permanence.
-2. Classer chaque element en `primaire`, `contextuel`, `secondaire`, `cache`.
-3. Supprimer ou deplacer tout ce qui n'aide pas l'ecriture dans les 5 premieres secondes.
-
-### Phase 2 - Recentrer le manuscrit
-
-1. Recomposer le centre autour d'une vraie colonne d'ecriture.
-2. Reduire la dominance des bordures, capsules et controles.
-3. Donner au texte, au titre et aux headings une presence editoriale nette.
-
-### Phase 3 - Repenser la marge
-
-1. Traiter la marge comme un carnet vivant.
-2. Faire ressortir les notes avant les commandes.
-3. Utiliser hover, menus secondaires et palette pour les actions moins frequentes.
-
-### Phase 4 - Signer visuellement le produit
-
-1. Choisir une direction esthetique explicite.
-2. Revoir typographie, contraste, profondeur et rythme des surfaces.
-3. Harmoniser topbar, manuscrit, notes, modales et vues d'export.
-
----
-
-## Criteres de succes globaux
-
-- Aucun crash silencieux sur les parcours critiques.
-- Surface de permission Tauri minimisee.
-- Persistance fiable et non agressive.
-- Export DOCX mieux cadre, teste et documente.
-- Un nouveau contributeur peut lancer les verifications locales sans ambiguite.
+- faire converger comportement reel, UI et experience d'ecriture
+
+## Checklist de fermeture d'item
+
+- [ ] le code est mergeable en l'etat
+- [ ] les verifications prevues ont ete lancees
+- [ ] la verification manuelle Windows est notee si necessaire
+- [ ] ce fichier est mis a jour
+- [ ] la PR ou le commit de reference est mentionne
