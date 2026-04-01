@@ -19,6 +19,7 @@ Il est volontairement oriente execution: ordre de passage, marquage des urgences
 - OK: `npm run lint:colors`
 - OK: `npm run verify`
 - OK: couverture automatisee etendue sur `queries`, invariants de linking, scheduler `New linked pair` et cleanup pointer global
+- OK: GitHub Actions `Verify` observe vert sur la branche `qa/verify-2026-04-01` (`#1` commit `952250c`, puis `#2` commit `386a5c1`)
 - Incident connu: workflow `New linked pair` / `New linked note` encore fragile selon le scenario utilisateur.
 - En cours: resize pointeur des panneaux reactive dans le code, verification manuelle Windows encore a faire.
 - Dette visible: drag pointeur des blocs de marge toujours desactive, en attente d'un ticket dedie.
@@ -52,7 +53,7 @@ Il est volontairement oriente execution: ordre de passage, marquage des urgences
 | CRIT-01 | [CRITIQUE] | P0 | Securite / DX | Remplacer le fallback de boot dangereux et repasser le depot au vert | done | S | - |
 | CRIT-02 | [CRITIQUE] | P0 | Stabilite | Corriger les gels d'interaction lies au pointer capture et reactiver le resize | in progress | M | - |
 | CRIT-03 | [CRITIQUE] | P0 | UX / Stabilite | Stabiliser le workflow `New linked pair` entre manuscrit et marges | in progress | M | CRIT-02 |
-| QA-01 | [HAUT] | P1 | Qualite | Poser une vraie chaine de verification locale + CI | in progress | M | CRIT-01, CRIT-03 |
+| QA-01 | [HAUT] | P1 | Qualite | Poser une vraie chaine de verification locale + CI | done | M | CRIT-01, CRIT-03 |
 | PERF-01 | [HAUT] | P1 | Performance | Supprimer les sync DOM O(n) sur les updates editeur | todo | L | QA-01 |
 | ARCH-01 | [HAUT] | P1 | Architecture | Decouper les gros fichiers oriente orchestration | todo | M | QA-01 |
 | EXP-01 | [MOYEN] | P2 | Produit | Aligner les attentes PDF/DOCX avec les comportements reels | todo | M | QA-01 |
@@ -277,17 +278,21 @@ Il est volontairement oriente execution: ordre de passage, marquage des urgences
 
 **Statut**
 
-- in progress le 2026-04-01
+- done le 2026-04-01
 - fait:
   - `npm run verify` ajoute
   - workflow GitHub Actions `verify.yml` ajoute
+  - workflow etendu a `push`, `pull_request` et `workflow_dispatch`
+  - permissions CI reduites a `contents: read`
   - README aligne sur la nouvelle chaine de verification
   - tests ajoutes sur `src/db/queries.ts`
   - tests ajoutes sur les invariants de linking critiques
   - tests ajoutes sur le scheduler `New linked pair`
   - tests ajoutes sur le cleanup pointer global
-- reste a faire:
-  - verifier un run CI vert sur GitHub Actions
+  - run GitHub Actions `Verify` observe vert sur la branche `qa/verify-2026-04-01`
+  - commit valide par CI:
+    - `952250c` - `Verify #1` - success
+    - `386a5c1` - `Verify #2` - success
 
 ---
 

@@ -72,6 +72,8 @@ npm run verify
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 - `cargo check --manifest-path src-tauri/Cargo.toml`
 
+The same verification chain runs in GitHub Actions on `push`, `pull_request`, and `workflow_dispatch`.
+
 If your shell cannot find `npm`, `node`, or `cargo`, open a fresh terminal after installation or fix your `PATH` first. On Windows, the most common locations are:
 
 - `C:\Program Files\nodejs`
