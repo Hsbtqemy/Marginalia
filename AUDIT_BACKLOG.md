@@ -57,14 +57,14 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 - done: 9
 - in progress: 5
 - todo: 1
-- hors backlog initial (critique): stabilite UX autour de `New linked note` (plantage/interactions gelees selon scenario utilisateur)
+- hors backlog initial (critique): stabilite UX autour du resize pointeur et de `New linked note` durcie dans le code et couverte par tests, verification manuelle Windows/Tauri encore a faire
 
 ### Reste a faire priorise
 
 1. `UX-02`, `UX-03`, `UX-04`, `UX-06`: terminer la passe writer-first (hierarchie manuscrit, marge carnet, densite d'aides, topbar).
 2. `UX-05`: finaliser la signature visuelle editoriale (coherence globale + captures avant/apres).
 3. `EXP-02`: phase export DOCX fidelity apres stabilisation UX/QA.
-4. Hors backlog initial critique: valider et fermer les scenarios manuels autour de `New linked note` / interactions gelees.
+4. Hors backlog initial critique: valider manuellement sous Windows/Tauri les scenarios resize pointeur, changement de document et `New linked note`.
 
 ---
 

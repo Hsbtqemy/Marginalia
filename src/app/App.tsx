@@ -35,47 +35,10 @@ import { buildMarginLinkIndexFromLexicalJson } from "../editors/margin/marginali
 import { buildManuscriptExcerptIndexFromLexicalJson } from "../editors/manuscript/lexicalBlocks/indexing";
 import { buildPrintPreviewHtml } from "../utils/printPreview";
 import { debounce } from "../utils/debounce";
+import { createLinkedMarginaliaScheduler } from "./linkedMarginalia";
+import { releaseStuckPointerState } from "./pointerState";
 
 const PREFS_FILE = "ui-preferences.json";
-
-function releaseStuckPointerState(): void {
-  const pointerIds = [1, 2, 3, 4, 5];
-  const allElements = document.querySelectorAll<HTMLElement>("*");
-  for (const element of allElements) {
-    if (typeof element.hasPointerCapture !== "function") {
-      continue;
-    }
-    for (const pointerId of pointerIds) {
-      try {
-        if (element.hasPointerCapture(pointerId)) {
-          element.releasePointerCapture(pointerId);
-        }
-      } catch {
-        // Ignore stale pointer capture handles.
-      }
-    }
-  }
-
-  document.body.style.userSelect = "";
-  if (document.body.style.cursor === "grabbing" || document.body.style.cursor === "col-resize") {
-    document.body.style.cursor = "";
-  }
-
-  const draggingRoots = document.querySelectorAll<HTMLElement>("[data-dragging='true']");
-  for (const root of draggingRoots) {
-    delete root.dataset.dragging;
-  }
-
-  const grabbedHandles = document.querySelectorAll<HTMLElement>("[data-grabbed='true']");
-  for (const handle of grabbedHandles) {
-    handle.dataset.grabbed = "false";
-  }
-
-  const dropTargets = document.querySelectorAll<HTMLElement>("[data-drop-position]");
-  for (const target of dropTargets) {
-    delete target.dataset.dropPosition;
-  }
-}
 
 function sanitizeFilename(text: string): string {
   return text
@@ -585,24 +548,46 @@ export default function App() {
     return manuscriptEditorRef.current?.createLinkedPassageBlock() ?? null;
   }, []);
 
-  const handleCreateLinkedMarginalia = useCallback(
-    (manuscriptBlockId: string | null) => {
-      window.setTimeout(() => {
-        const resolvedBlockId = resolveManuscriptBlockForLink(manuscriptBlockId);
-        if (!resolvedBlockId) {
-          return;
-        }
-        try {
-          manuscriptEditorRef.current?.focusBlockById(resolvedBlockId);
-          leftEditorRef.current?.insertBlock(resolvedBlockId);
+  const linkedCreationScheduler = useMemo(
+    () =>
+      createLinkedMarginaliaScheduler({
+        timers: window,
+        getCurrentDocumentId: () => useAppStore.getState().currentDocumentId,
+        resolveManuscriptBlockForLink,
+        focusManuscriptBlockById: (manuscriptBlockId) => {
+          manuscriptEditorRef.current?.focusBlockById(manuscriptBlockId);
+        },
+        insertLinkedMarginBlock: (manuscriptBlockId) => {
+          leftEditorRef.current?.insertBlock(manuscriptBlockId);
+        },
+        focusMarginEditor: () => {
           leftEditorRef.current?.focusEditor();
-        } catch (error) {
-          reportError("A linked note could not be created.", error);
-        }
-      }, 0);
-    },
+        },
+        reportError,
+      }),
     [reportError, resolveManuscriptBlockForLink],
   );
+
+  const handleCreateLinkedMarginalia = useCallback(
+    (manuscriptBlockId: string | null) => {
+      if (!currentDocumentId) {
+        return;
+      }
+
+      linkedCreationScheduler.schedule(currentDocumentId, manuscriptBlockId);
+    },
+    [currentDocumentId, linkedCreationScheduler],
+  );
+
+  useEffect(() => {
+    linkedCreationScheduler.clearPending();
+  }, [currentDocumentId, linkedCreationScheduler]);
+
+  useEffect(() => {
+    return () => {
+      linkedCreationScheduler.clearPending();
+    };
+  }, [linkedCreationScheduler]);
 
   const handleRevealMarginalia = useCallback((manuscriptBlockId: string | null) => {
     if (!manuscriptBlockId) {

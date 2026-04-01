@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -21,9 +22,7 @@ const MIN_LEFT_RATIO = 0.15;
 const MAX_LEFT_RATIO = 0.24;
 const MIN_RIGHT_RATIO = 0.14;
 const MAX_RIGHT_RATIO = 0.22;
-// Safety fallback: pointer-capture based resize can lock input on some Windows/WebView setups.
-// Keep keyboard resize active, but disable pointer resize until a fully stable implementation lands.
-const ENABLE_POINTER_RESIZE = false;
+const ENABLE_POINTER_RESIZE = true;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -31,6 +30,14 @@ function clamp(value: number, min: number, max: number): number {
 
 export function ThreePaneLayout(props: ThreePaneLayoutProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const activeResizeCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      activeResizeCleanupRef.current?.();
+      activeResizeCleanupRef.current = null;
+    };
+  }, []);
 
   const handleResizeStart = (side: "left" | "right") => (event: ReactPointerEvent<HTMLDivElement>) => {
     const root = rootRef.current;
@@ -50,8 +57,14 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
     const previousBodyCursor = document.body.style.cursor;
     let cleaned = false;
 
+    activeResizeCleanupRef.current?.();
+    activeResizeCleanupRef.current = null;
+
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
+    root.dataset.resizing = side;
+    handle.dataset.resizing = "true";
+    handle.dataset.pointerCaptureId = String(pointerId);
 
     event.preventDefault();
 
@@ -77,16 +90,31 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
       }
       cleaned = true;
 
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerCancel);
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", onPointerUp);
+      handle.removeEventListener("pointercancel", onPointerCancel);
       window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       handle.removeEventListener("lostpointercapture", onLostPointerCapture as EventListener);
+      delete handle.dataset.resizing;
+      delete handle.dataset.pointerCaptureId;
+      if (root.dataset.resizing === side) {
+        delete root.dataset.resizing;
+      }
       document.body.style.userSelect = previousBodyUserSelect;
       document.body.style.cursor = previousBodyCursor;
 
-      if (handle.hasPointerCapture(pointerId)) {
-        handle.releasePointerCapture(pointerId);
+      try {
+        if (typeof handle.hasPointerCapture === "function" && handle.hasPointerCapture(pointerId)) {
+          handle.releasePointerCapture(pointerId);
+        }
+      } catch {
+        // Ignore stale pointer capture state when the runtime has already released it.
+      }
+
+      if (activeResizeCleanupRef.current === cleanup) {
+        activeResizeCleanupRef.current = null;
       }
     };
 
@@ -108,6 +136,18 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
       cleanup();
     };
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        cleanup();
+      }
+    };
+
+    const onKeyDown = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === "Escape") {
+        cleanup();
+      }
+    };
+
     const onLostPointerCapture = (lostEvent: PointerEvent) => {
       if (lostEvent.pointerId !== pointerId) {
         return;
@@ -115,12 +155,21 @@ export function ThreePaneLayout(props: ThreePaneLayoutProps) {
       cleanup();
     };
 
-    handle.setPointerCapture(pointerId);
+    try {
+      handle.setPointerCapture(pointerId);
+    } catch {
+      cleanup();
+      return;
+    }
+
+    activeResizeCleanupRef.current = cleanup;
     handle.addEventListener("lostpointercapture", onLostPointerCapture as EventListener);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerCancel);
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", onPointerUp);
+    handle.addEventListener("pointercancel", onPointerCancel);
     window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("visibilitychange", onVisibilityChange);
   };
 
   const handleResizerKey = (side: "left" | "right") => (event: ReactKeyboardEvent<HTMLDivElement>) => {

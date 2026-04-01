@@ -282,6 +282,7 @@ textarea:focus-visible,
   border-left: 1px solid var(--separator);
   border-right: 1px solid var(--separator);
   cursor: col-resize;
+  touch-action: none;
 }
 
 .resizer:focus-visible {
