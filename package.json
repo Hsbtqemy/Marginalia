@@ -9,6 +9,7 @@
     "lint:colors": "node scripts/lint-colors.mjs",
     "preview": "vite preview",
     "test": "node scripts/run-tests.mjs",
+    "verify": "npm run lint:colors && npm test && npm run build && cargo test --manifest-path src-tauri/Cargo.toml && cargo check --manifest-path src-tauri/Cargo.toml",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

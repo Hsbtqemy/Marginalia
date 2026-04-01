@@ -22,7 +22,7 @@ async function collectTests(dir) {
 }
 
 const root = path.resolve("src");
-const testFiles = await collectTests(root);
+const testFiles = (await collectTests(root)).sort();
 
 if (testFiles.length === 0) {
   console.error("No test files were found under src/.");

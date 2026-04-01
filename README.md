@@ -61,11 +61,18 @@ npm run tauri:build
 
 ```bash
 npm install
-npm run lint:colors
-npm test
-npm run build
-cargo check --manifest-path src-tauri/Cargo.toml
+npm run verify
 ```
+
+`npm run verify` runs:
+
+- `npm run lint:colors`
+- `npm test`
+- `npm run build`
+- `cargo test --manifest-path src-tauri/Cargo.toml`
+- `cargo check --manifest-path src-tauri/Cargo.toml`
+
+The same verification chain runs in GitHub Actions on `push`, `pull_request`, and `workflow_dispatch`.
 
 ## Project layout
 

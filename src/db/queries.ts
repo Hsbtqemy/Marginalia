@@ -8,7 +8,7 @@ import {
 } from "../presets/presetSchema";
 import { normalizeLinkedManuscriptBlocks } from "../editors/manuscript/lexicalBlocks/linkableBlockNormalization";
 import { newUuid } from "../utils/uuid";
-import { runInTransaction, runSerializedWrite } from "./db";
+import { runInTransaction, runSerializedWrite } from "./writeUtils";
 
 export interface DocumentRecord {
   id: string;
