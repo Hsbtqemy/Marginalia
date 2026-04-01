@@ -1,22 +1,11 @@
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { ListItemNode } from "@lexical/list";
-import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import {
   COMMAND_PRIORITY_LOW,
-  ParagraphNode,
   SELECTION_CHANGE_COMMAND,
-  type LexicalNode,
 } from "lexical";
 import { mergeRegister } from "@lexical/utils";
-import { ensureBlockId } from "./blockIdState";
-import { collectBlockDomBindings, getCurrentSelectionBlockId, isManuscriptBlockNode } from "./manuscriptBlockUtils";
-
-function handleBlockIdTransform(node: LexicalNode): void {
-  if (isManuscriptBlockNode(node)) {
-    ensureBlockId(node);
-  }
-}
+import { collectBlockDomBindings, getCurrentSelectionBlockId } from "./manuscriptBlockUtils";
 
 export function BlockIdPlugin(props: { onCurrentBlockIdChange: (blockId: string | null) => void }): null {
   const [editor] = useLexicalComposerContext();
@@ -28,10 +17,6 @@ export function BlockIdPlugin(props: { onCurrentBlockIdChange: (blockId: string 
     });
 
     return mergeRegister(
-      editor.registerNodeTransform(ParagraphNode, handleBlockIdTransform),
-      editor.registerNodeTransform(HeadingNode, handleBlockIdTransform),
-      editor.registerNodeTransform(QuoteNode, handleBlockIdTransform),
-      editor.registerNodeTransform(ListItemNode, handleBlockIdTransform),
       editor.registerCommand(
         SELECTION_CHANGE_COMMAND,
         () => {

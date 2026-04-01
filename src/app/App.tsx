@@ -572,22 +572,36 @@ export default function App() {
     void persistPreference("highContrast", next);
   }, [persistPreference, setHighContrast]);
 
+  const resolveManuscriptBlockForLink = useCallback((manuscriptBlockId: string | null): string | null => {
+    if (manuscriptBlockId) {
+      return manuscriptBlockId;
+    }
+
+    const ensuredBlockId = manuscriptEditorRef.current?.ensureCurrentSelectionBlockId() ?? null;
+    if (ensuredBlockId) {
+      return ensuredBlockId;
+    }
+
+    return manuscriptEditorRef.current?.createLinkedPassageBlock() ?? null;
+  }, []);
+
   const handleCreateLinkedMarginalia = useCallback(
     (manuscriptBlockId: string | null) => {
-      if (!manuscriptBlockId) {
-        return;
-      }
-
       window.setTimeout(() => {
+        const resolvedBlockId = resolveManuscriptBlockForLink(manuscriptBlockId);
+        if (!resolvedBlockId) {
+          return;
+        }
         try {
-          leftEditorRef.current?.insertBlock(manuscriptBlockId);
+          manuscriptEditorRef.current?.focusBlockById(resolvedBlockId);
+          leftEditorRef.current?.insertBlock(resolvedBlockId);
           leftEditorRef.current?.focusEditor();
         } catch (error) {
           reportError("A linked note could not be created.", error);
         }
       }, 0);
     },
-    [reportError],
+    [reportError, resolveManuscriptBlockForLink],
   );
 
   const handleRevealMarginalia = useCallback((manuscriptBlockId: string | null) => {
@@ -761,15 +775,12 @@ export default function App() {
       },
       {
         id: "left.new-linked",
-        title: "Left notes: create linked note",
+        title: "Left notes: create linked pair",
         section: "Left Notes",
-        disabled: !currentManuscriptBlockId,
+        disabled: false,
         shortcut: "Ctrl/Cmd+Alt+N",
         keywords: ["note anchor manuscript"],
-        onSelect: () => {
-          leftEditorRef.current?.insertBlock(currentManuscriptBlockId);
-          leftEditorRef.current?.focusEditor();
-        },
+        onSelect: () => handleCreateLinkedMarginalia(currentManuscriptBlockId),
       },
       {
         id: "left.duplicate",
@@ -870,6 +881,7 @@ export default function App() {
       handleRenameDocument,
       handleTogglePagePreview,
       handleToggleRightPane,
+      handleCreateLinkedMarginalia,
       leftCurrentBlockId,
       pagePreview,
       rightCurrentBlockId,
@@ -1015,6 +1027,7 @@ export default function App() {
             onCurrentBlockIdChange={setLeftCurrentBlockId}
             onLinkIndexChange={setLeftLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}
+            onRequestCreateLinkedNote={() => handleCreateLinkedMarginalia(currentManuscriptBlockId)}
             onFocusChange={(focused) => {
               if (focused) {
                 setActivePane("left");

@@ -106,6 +106,7 @@ interface MarginEditorBaseProps {
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
+  onRequestCreateLinkedNote?: () => void;
   onFocusChange?: (focused: boolean) => void;
 }
 
@@ -328,6 +329,7 @@ function MarginBridgePlugin(props: {
   manuscriptExcerptByBlockId: Record<string, string>;
   onGoToLinkedManuscript: () => void;
   onToolbarStateChange: (state: MarginToolbarState) => void;
+  onRequestCreateLinkedNote?: () => void;
   onFocusChange?: (focused: boolean) => void;
 }): null {
   const [editor] = useLexicalComposerContext();
@@ -338,6 +340,7 @@ function MarginBridgePlugin(props: {
     onBlurSave: props.onBlurSave,
     onGoToLinkedManuscript: props.onGoToLinkedManuscript,
     onToolbarStateChange: props.onToolbarStateChange,
+    onRequestCreateLinkedNote: props.onRequestCreateLinkedNote,
     onFocusChange: props.onFocusChange,
   });
 
@@ -349,6 +352,7 @@ function MarginBridgePlugin(props: {
       onBlurSave: props.onBlurSave,
       onGoToLinkedManuscript: props.onGoToLinkedManuscript,
       onToolbarStateChange: props.onToolbarStateChange,
+      onRequestCreateLinkedNote: props.onRequestCreateLinkedNote,
       onFocusChange: props.onFocusChange,
     };
   }, [
@@ -358,6 +362,7 @@ function MarginBridgePlugin(props: {
     props.onBlurSave,
     props.onGoToLinkedManuscript,
     props.onToolbarStateChange,
+    props.onRequestCreateLinkedNote,
     props.onFocusChange,
   ]);
 
@@ -404,6 +409,10 @@ function MarginBridgePlugin(props: {
           const key = event.key.toLowerCase();
           if (key === "n") {
             event.preventDefault();
+            if (callbacksRef.current.onRequestCreateLinkedNote) {
+              callbacksRef.current.onRequestCreateLinkedNote();
+              return true;
+            }
             editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
               kind: props.kind,
               linkedManuscriptBlockId: callbacksRef.current.currentManuscriptBlockId,
@@ -849,6 +858,7 @@ function MarginToolbar(props: {
   currentManuscriptBlockId: string | null;
   toolbarState: MarginToolbarState;
   onInsertLinkedBlock: () => void;
+  canInsertLinkedBlock: boolean;
   onGoToLinkedManuscript: () => void;
 }) {
   const run = (callback: (editor: LexicalEditor) => void) => {
@@ -905,9 +915,9 @@ function MarginToolbar(props: {
             className="toolbar-button toolbar-button-prominent"
             type="button"
             onClick={props.onInsertLinkedBlock}
-            disabled={!props.currentManuscriptBlockId}
+            disabled={!props.canInsertLinkedBlock}
           >
-            New Linked Note
+            New Linked Pair
           </button>
         </div>
         <div className="toolbar-inline-group">
@@ -1107,7 +1117,7 @@ function MarginToolbar(props: {
         <details className="context-help">
           <summary>Help</summary>
           <div className="context-help-body">
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked note</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked pair</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+L link current note</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G jump to passage</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+D duplicate note</span>
@@ -1332,7 +1342,8 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           kind={props.kind}
           currentManuscriptBlockId={currentManuscriptBlockId}
           toolbarState={toolbarState}
-          onInsertLinkedBlock={() => insertBlock(currentManuscriptBlockId)}
+          onInsertLinkedBlock={props.onRequestCreateLinkedNote ?? (() => insertBlock(currentManuscriptBlockId))}
+          canInsertLinkedBlock={Boolean(props.onRequestCreateLinkedNote) || Boolean(currentManuscriptBlockId)}
           onGoToLinkedManuscript={goToLinkedManuscript}
         />
         <div className="lexical-scroll margin-scroll">
@@ -1363,6 +1374,7 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
           onGoToLinkedManuscript={goToLinkedManuscript}
           onToolbarStateChange={handleToolbarStateChange}
+          onRequestCreateLinkedNote={props.onRequestCreateLinkedNote}
           onFocusChange={props.onFocusChange}
           onBlurSave={handleBlurSave}
         />

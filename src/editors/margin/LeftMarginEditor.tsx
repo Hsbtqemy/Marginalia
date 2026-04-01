@@ -10,6 +10,7 @@ interface LeftMarginEditorProps {
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
+  onRequestCreateLinkedNote?: () => void;
   onFocusChange?: (focused: boolean) => void;
 }
 
@@ -27,6 +28,7 @@ export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEdi
         onCurrentBlockIdChange={props.onCurrentBlockIdChange}
         onLinkIndexChange={props.onLinkIndexChange}
         onNavigateToManuscriptBlock={props.onNavigateToManuscriptBlock}
+        onRequestCreateLinkedNote={props.onRequestCreateLinkedNote}
         onFocusChange={props.onFocusChange}
       />
     );

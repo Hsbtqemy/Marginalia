@@ -48,6 +48,8 @@ import {
   findManuscriptBlockNodeById,
   getCurrentSelectionBlockId,
   getSelectionBlockNode,
+  ensureCurrentSelectionBlockId as ensureCurrentSelectionBlockIdInEditor,
+  insertLinkedPassageAfterSelection,
 } from "./lexicalBlocks/manuscriptBlockUtils";
 
 const MANUSCRIPT_THEME = {
@@ -70,6 +72,8 @@ export interface ManuscriptEditorHandle {
   focusEditor: () => void;
   getHtml: () => string;
   getLexicalJson: () => string;
+  ensureCurrentSelectionBlockId: () => string | null;
+  createLinkedPassageBlock: () => string | null;
 }
 
 interface ManuscriptEditorProps {
@@ -321,10 +325,9 @@ function ManuscriptToolbar(props: {
           <button
             className="toolbar-button toolbar-button-prominent"
             type="button"
-            disabled={!currentManuscriptBlockId}
             onClick={() => props.onCreateLinkedMarginalia(currentManuscriptBlockId)}
           >
-            New Linked Note
+            New Linked Pair
           </button>
           <button
             className="toolbar-button toolbar-button-compact"
@@ -418,7 +421,7 @@ function ManuscriptToolbar(props: {
       </div>
       <div className="margin-writing-status manuscript-context-row">
         <span className={`margin-status-chip ${currentManuscriptBlockId ? "is-targeting" : ""}`}>
-          {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select a passage"}
+          {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select or create a passage"}
         </span>
         {currentManuscriptBlockId ? (
           <span className="margin-status-chip">Notes: L{linkedLeftCount} R{linkedRightCount}</span>
@@ -426,7 +429,7 @@ function ManuscriptToolbar(props: {
         <details className="context-help">
           <summary>Help</summary>
           <div className="context-help-body">
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked note</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked pair</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G show linked notes</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+1/2/3 apply heading</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+0 return to paragraph</span>
@@ -526,6 +529,30 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
           }
           return JSON.stringify(editor.getEditorState().toJSON());
         },
+        ensureCurrentSelectionBlockId: () => {
+          const editor = editorRef.current;
+          if (!editor) {
+            return null;
+          }
+
+          let ensuredBlockId: string | null = null;
+          editor.update(() => {
+            ensuredBlockId = ensureCurrentSelectionBlockIdInEditor();
+          });
+          return ensuredBlockId;
+        },
+        createLinkedPassageBlock: () => {
+          const editor = editorRef.current;
+          if (!editor) {
+            return null;
+          }
+
+          let createdBlockId: string | null = null;
+          editor.update(() => {
+            createdBlockId = insertLinkedPassageAfterSelection();
+          });
+          return createdBlockId;
+        },
       }),
       [props.initialStateJson],
     );
@@ -560,7 +587,7 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
                   <div className="lexical-placeholder manuscript-placeholder">
                     <span className="manuscript-placeholder-title">Begin the manuscript.</span>
                     <span className="manuscript-placeholder-copy">
-                      Draft a passage here, then pull linked notes into the margin as the argument takes shape.
+                      Draft a passage here, then create linked pairs so each manuscript zone has its aligned margin note.
                     </span>
                   </div>
                 }

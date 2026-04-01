@@ -6,6 +6,7 @@ import {
   type ExportPresetRecord,
   normalizePreset,
 } from "../presets/presetSchema";
+import { normalizeLinkedManuscriptBlocks } from "../editors/manuscript/lexicalBlocks/linkableBlockNormalization";
 import { newUuid } from "../utils/uuid";
 import { runInTransaction, runSerializedWrite } from "./db";
 
@@ -88,8 +89,8 @@ function createRoot(children: Record<string, unknown>[]): Record<string, unknown
 function defaultManuscriptState(): string {
   return JSON.stringify(
     createRoot([
-      createParagraphNode("Start writing your manuscript here.", newUuid()),
-      createParagraphNode("Use Cmd/Ctrl+Alt+N to push context into marginalia.", newUuid()),
+      createParagraphNode("Start writing your manuscript here."),
+      createParagraphNode("Use Cmd/Ctrl+Alt+N to push context into marginalia."),
     ]),
   );
 }
@@ -249,10 +250,26 @@ export async function getDocumentStateBundle(db: Database, documentId: string): 
     [documentId],
   );
 
+  const leftMarginJson = leftRow[0]?.lexical_json ?? defaultLeftMarginState();
+  const rightMarginJson = rightRow[0]?.lexical_json ?? defaultRightMarginState();
+  const rawManuscriptJson = manuscriptRow[0]?.lexical_json ?? defaultManuscriptState();
+
+  const normalizedManuscript = normalizeLinkedManuscriptBlocks(rawManuscriptJson, leftMarginJson, rightMarginJson);
+
+  if (normalizedManuscript.changed) {
+    const now = Date.now();
+    await runSerializedWrite(db, async () => {
+      await db.execute(
+        "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+        [documentId, normalizedManuscript.lexicalJson, now],
+      );
+    });
+  }
+
   return {
-    manuscriptJson: manuscriptRow[0]?.lexical_json ?? defaultManuscriptState(),
-    leftMarginJson: leftRow[0]?.lexical_json ?? defaultLeftMarginState(),
-    rightMarginJson: rightRow[0]?.lexical_json ?? defaultRightMarginState(),
+    manuscriptJson: normalizedManuscript.lexicalJson,
+    leftMarginJson,
+    rightMarginJson,
     defaultPresetId: exportRow[0]?.default_preset_id ?? BUILTIN_PRESETS[0].id,
   };
 }
