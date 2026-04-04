@@ -56,10 +56,18 @@ import {
   SPLIT_CURRENT_MARGINALIA_BLOCK_COMMAND,
   INSERT_MARGINALIA_BLOCK_COMMAND,
   UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND,
+  $deleteMarginaliaBlocksById,
+  $duplicateMarginaliaBlockById,
   $ensureFirstMarginaliaBlock,
+  $findFirstMarginaliaBlockByLinkedManuscriptId,
+  $findMarginaliaBlocksByLinkedManuscriptId,
   $normalizeMarginaliaRoot,
   $findMarginaliaBlockById,
   $getCurrentMarginaliaBlockNode,
+  $insertMarginaliaBlockAt,
+  $moveMarginaliaBlockAfter,
+  $moveMarginaliaBlockBefore,
+  $normalizeLegacyLinkedMarginaliaBlocks,
   registerMarginaliaCommands,
 } from "./marginaliaBlocks/commands";
 import {
@@ -68,6 +76,10 @@ import {
   type MarginKind,
 } from "./marginaliaBlocks/MarginaliaBlockNode";
 import { buildMarginLinkIndexFromLexicalJson } from "./marginaliaBlocks/indexing";
+import {
+  collectMarginaliaPresentationSummaries,
+  type LeftScholiePresentationState,
+} from "./marginaliaBlocks/presentationState";
 
 const MARGIN_THEME = {
   paragraph: "",
@@ -79,8 +91,18 @@ const MARGIN_THEME = {
 };
 
 export interface MarginEditorHandle {
-  insertBlock: (linkedManuscriptBlockId: string | null) => void;
+  insertBlock: (
+    linkedManuscriptBlockId: string | null,
+    options?: {
+      afterMarginBlockId?: string | null;
+      beforeMarginBlockId?: string | null;
+      select?: boolean;
+    },
+  ) => string | null;
   revealForManuscriptBlock: (manuscriptBlockId: string) => void;
+  findBlockIdForLinkedManuscript: (manuscriptBlockId: string) => string | null;
+  findBlockIdsForLinkedManuscript: (manuscriptBlockId: string) => string[];
+  getLinkedManuscriptBlockIdForBlock: (marginBlockId: string) => string | null;
   focusBlockById: (marginBlockId: string) => void;
   focusEditor: () => void;
   getLexicalJson: () => string;
@@ -93,7 +115,20 @@ export interface MarginEditorHandle {
   mergeCurrentUp: () => void;
   mergeCurrentDown: () => void;
   deleteCurrent: () => void;
+  duplicateBlockById: (
+    marginBlockId: string,
+    options?: {
+      linkedManuscriptBlockId?: string | null;
+      afterMarginBlockId?: string | null;
+      beforeMarginBlockId?: string | null;
+      select?: boolean;
+    },
+  ) => string | null;
+  moveBlockBefore: (marginBlockId: string, beforeMarginBlockId: string, options?: { select?: boolean }) => boolean;
+  moveBlockAfter: (marginBlockId: string, afterMarginBlockId: string, options?: { select?: boolean }) => boolean;
+  deleteBlocksById: (marginBlockIds: string[]) => number;
   goToLinkedManuscript: () => void;
+  normalizeLegacyLinkedDuplicates: () => number;
 }
 
 interface MarginEditorBaseProps {
@@ -108,6 +143,10 @@ interface MarginEditorBaseProps {
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
   onRequestCreateLinkedNote?: () => void;
   onFocusChange?: (focused: boolean) => void;
+  legacyDuplicateSummary?: {
+    affectedUnitCount: number;
+    duplicateScholieCount: number;
+  } | null;
 }
 
 type MarginBlockType = "paragraph" | "h1" | "h2" | "h3" | "quote" | "bullets" | "numbers" | "checklist";
@@ -118,6 +157,7 @@ interface MarginToolbarState {
   underline: boolean;
   blockType: MarginBlockType;
   linkedManuscriptBlockId: string | null;
+  hasContent: boolean;
 }
 
 interface MarginUiCopy {
@@ -173,6 +213,7 @@ const DEFAULT_MARGIN_TOOLBAR_STATE: MarginToolbarState = {
   underline: false,
   blockType: "paragraph",
   linkedManuscriptBlockId: null,
+  hasContent: false,
 };
 
 function getMarginUiCopy(kind: MarginKind): MarginUiCopy {
@@ -225,7 +266,8 @@ function marginToolbarStateEquals(a: MarginToolbarState, b: MarginToolbarState):
     a.italic === b.italic &&
     a.underline === b.underline &&
     a.blockType === b.blockType &&
-    a.linkedManuscriptBlockId === b.linkedManuscriptBlockId
+    a.linkedManuscriptBlockId === b.linkedManuscriptBlockId &&
+    a.hasContent === b.hasContent
   );
 }
 
@@ -247,6 +289,7 @@ function readMarginToolbarState(): MarginToolbarState {
   const nextState: MarginToolbarState = {
     ...DEFAULT_MARGIN_TOOLBAR_STATE,
     linkedManuscriptBlockId: currentBlock?.getLinkedManuscriptBlockId() ?? null,
+    hasContent: currentBlock?.getTextContent().trim().length ? true : false,
   };
 
   if (!$isRangeSelection(selection)) {
@@ -304,6 +347,44 @@ function syncLinkedPreviews(
     preview.hidden = false;
     preview.textContent =
       manuscriptExcerptByBlockId[linkedManuscriptBlockId] ?? "Linked passage unavailable in the manuscript.";
+  }
+}
+
+function syncMarginaliaPresentationState(
+  rootElement: HTMLElement | null,
+  presentations: Array<{
+    marginBlockId: string;
+    isCurrent: boolean;
+    hasContent: boolean;
+    scholieState: LeftScholiePresentationState;
+  }>,
+): void {
+  if (!rootElement) {
+    return;
+  }
+
+  const presentationById = new Map(
+    presentations.map((presentation) => [presentation.marginBlockId, presentation] as const),
+  );
+
+  const blocks = rootElement.querySelectorAll<HTMLElement>("[data-lexical-marginalia-block='true']");
+  for (const block of blocks) {
+    const marginBlockId = block.dataset.marginBlockId ?? "";
+    const presentation = presentationById.get(marginBlockId);
+    if (!presentation) {
+      delete block.dataset.currentBlock;
+      delete block.dataset.hasContent;
+      delete block.dataset.scholieState;
+      continue;
+    }
+
+    block.dataset.currentBlock = presentation.isCurrent ? "true" : "false";
+    block.dataset.hasContent = presentation.hasContent ? "true" : "false";
+    if (presentation.scholieState) {
+      block.dataset.scholieState = presentation.scholieState;
+    } else {
+      delete block.dataset.scholieState;
+    }
   }
 }
 
@@ -441,10 +522,18 @@ function MarginBridgePlugin(props: {
 
   useEffect(() => {
     const syncToolbarState = () => {
+      let nextToolbarState = DEFAULT_MARGIN_TOOLBAR_STATE;
+      let currentMarginBlockId: string | null = null;
+      let presentations: ReturnType<typeof collectMarginaliaPresentationSummaries> = [];
+
       editor.getEditorState().read(() => {
-        callbacksRef.current.onToolbarStateChange(readMarginToolbarState());
+        currentMarginBlockId = $getCurrentMarginaliaBlockNode()?.getMarginBlockId() ?? null;
+        nextToolbarState = readMarginToolbarState();
+        presentations = collectMarginaliaPresentationSummaries(props.kind, currentMarginBlockId);
       });
+      callbacksRef.current.onToolbarStateChange(nextToolbarState);
       syncLinkedPreviews(editor.getRootElement(), callbacksRef.current.manuscriptExcerptByBlockId);
+      syncMarginaliaPresentationState(editor.getRootElement(), presentations);
     };
 
     syncToolbarState();
@@ -456,8 +545,8 @@ function MarginBridgePlugin(props: {
           editor.getEditorState().read(() => {
             const block = $getCurrentMarginaliaBlockNode();
             callbacksRef.current.onCurrentBlockIdChange(block?.getMarginBlockId() ?? null);
-            callbacksRef.current.onToolbarStateChange(readMarginToolbarState());
           });
+          syncToolbarState();
           return false;
         },
         COMMAND_PRIORITY_LOW,
@@ -924,6 +1013,10 @@ function MarginToolbar(props: {
   onInsertLinkedBlock: () => void;
   canInsertLinkedBlock: boolean;
   onGoToLinkedManuscript: () => void;
+  legacyDuplicateSummary?: {
+    affectedUnitCount: number;
+    duplicateScholieCount: number;
+  } | null;
 }) {
   const copy = getMarginUiCopy(props.kind);
 
@@ -1181,6 +1274,14 @@ function MarginToolbar(props: {
           {props.currentManuscriptBlockId ? (
             <span className="margin-status-chip is-targeting">Passage ready</span>
           ) : null}
+          {props.kind === "left" && props.toolbarState.linkedManuscriptBlockId && !props.toolbarState.hasContent ? (
+            <span className="margin-status-chip">Empty scholie</span>
+          ) : null}
+          {props.kind === "left" && props.legacyDuplicateSummary ? (
+            <span className="margin-status-chip is-warning">
+              Legacy duplicates {props.legacyDuplicateSummary.duplicateScholieCount}
+            </span>
+          ) : null}
         </div>
         <details className="context-help">
           <summary>Help</summary>
@@ -1214,9 +1315,11 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
   const linkIndexSave = useMemo(
     () =>
       debounce((json: string) => {
-        props.onLinkIndexChange(buildMarginLinkIndexFromLexicalJson(json));
+        props.onLinkIndexChange(
+          buildMarginLinkIndexFromLexicalJson(json, { uniquePerManuscriptBlock: props.kind === "left" }),
+        );
       }, 350),
-    [props.onLinkIndexChange],
+    [props.kind, props.onLinkIndexChange],
   );
   const handleToolbarStateChange = useCallback((nextState: MarginToolbarState) => {
     setToolbarState((previousState) =>
@@ -1232,8 +1335,10 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
     linkIndexSave.cancel();
     const json = JSON.stringify(editor.getEditorState().toJSON());
     props.onAutosave(json);
-    props.onLinkIndexChange(buildMarginLinkIndexFromLexicalJson(json));
-  }, [autosave, linkIndexSave, props.onAutosave, props.onLinkIndexChange]);
+    props.onLinkIndexChange(
+      buildMarginLinkIndexFromLexicalJson(json, { uniquePerManuscriptBlock: props.kind === "left" }),
+    );
+  }, [autosave, linkIndexSave, props.kind, props.onAutosave, props.onLinkIndexChange]);
 
   useEffect(() => {
     return () => {
@@ -1249,19 +1354,36 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
     syncLinkedPreviews(editorRef.current?.getRootElement() ?? null, props.manuscriptExcerptByBlockId);
   }, [props.manuscriptExcerptByBlockId]);
 
-  const insertBlock = (linkedManuscriptBlockId: string | null) => {
+  const insertBlock = (
+    linkedManuscriptBlockId: string | null,
+    options?: {
+      afterMarginBlockId?: string | null;
+      beforeMarginBlockId?: string | null;
+      select?: boolean;
+    },
+  ) => {
     const editor = editorRef.current;
     if (!editor) {
-      return;
+      return null;
     }
     try {
-      editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
-        kind: props.kind,
-        linkedManuscriptBlockId,
+      let createdMarginBlockId: string | null = null;
+      editor.update(() => {
+        createdMarginBlockId = $insertMarginaliaBlockAt(
+          {
+            kind: props.kind,
+            linkedManuscriptBlockId,
+          },
+          options,
+        ).getMarginBlockId();
       });
-      editor.focus();
+      if (options?.select ?? true) {
+        editor.focus();
+      }
+      return createdMarginBlockId;
     } catch (error) {
       console.error("Failed to insert marginalia block", error);
+      return null;
     }
   };
 
@@ -1277,11 +1399,53 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
         block.selectStart();
       }
     });
+    editor.focus();
 
     const rootElement = editor.getRootElement();
     const candidates = rootElement?.querySelectorAll<HTMLElement>("[data-margin-block-id]");
     const target = [...(candidates ?? [])].find((element) => element.dataset.marginBlockId === marginBlockId);
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const findBlockIdForLinkedManuscript = (manuscriptBlockId: string) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return null;
+    }
+
+    let marginBlockId: string | null = null;
+    editor.getEditorState().read(() => {
+      marginBlockId = $findFirstMarginaliaBlockByLinkedManuscriptId(manuscriptBlockId)?.getMarginBlockId() ?? null;
+    });
+    return marginBlockId;
+  };
+
+  const findBlockIdsForLinkedManuscript = (manuscriptBlockId: string) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return [];
+    }
+
+    let marginBlockIds: string[] = [];
+    editor.getEditorState().read(() => {
+      marginBlockIds = $findMarginaliaBlocksByLinkedManuscriptId(manuscriptBlockId).map((block) =>
+        block.getMarginBlockId(),
+      );
+    });
+    return marginBlockIds;
+  };
+
+  const getLinkedManuscriptBlockIdForBlock = (marginBlockId: string) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return null;
+    }
+
+    let linkedManuscriptBlockId: string | null = null;
+    editor.getEditorState().read(() => {
+      linkedManuscriptBlockId = $findMarginaliaBlockById(marginBlockId)?.getLinkedManuscriptBlockId() ?? null;
+    });
+    return linkedManuscriptBlockId;
   };
 
   const goToLinkedManuscript = () => {
@@ -1298,6 +1462,97 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
     if (linked) {
       props.onNavigateToManuscriptBlock(linked);
     }
+  };
+
+  const normalizeLegacyLinkedDuplicates = () => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return 0;
+    }
+
+    let normalizedCount = 0;
+    editor.update(() => {
+      normalizedCount = $normalizeLegacyLinkedMarginaliaBlocks(props.kind);
+    });
+    return normalizedCount;
+  };
+
+  const duplicateBlockById = (
+    marginBlockId: string,
+    options?: {
+      linkedManuscriptBlockId?: string | null;
+      afterMarginBlockId?: string | null;
+      beforeMarginBlockId?: string | null;
+      select?: boolean;
+    },
+  ) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return null;
+    }
+
+    let duplicatedMarginBlockId: string | null = null;
+    editor.update(() => {
+      duplicatedMarginBlockId =
+        $duplicateMarginaliaBlockById(marginBlockId, options)?.getMarginBlockId() ?? null;
+    });
+    if (duplicatedMarginBlockId && (options?.select ?? true)) {
+      editor.focus();
+    }
+    return duplicatedMarginBlockId;
+  };
+
+  const moveBlockBefore = (
+    marginBlockId: string,
+    beforeMarginBlockId: string,
+    options?: { select?: boolean },
+  ) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return false;
+    }
+
+    let handled = false;
+    editor.update(() => {
+      handled = $moveMarginaliaBlockBefore(marginBlockId, beforeMarginBlockId, options);
+    });
+    if (handled && options?.select) {
+      editor.focus();
+    }
+    return handled;
+  };
+
+  const moveBlockAfter = (
+    marginBlockId: string,
+    afterMarginBlockId: string,
+    options?: { select?: boolean },
+  ) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return false;
+    }
+
+    let handled = false;
+    editor.update(() => {
+      handled = $moveMarginaliaBlockAfter(marginBlockId, afterMarginBlockId, options);
+    });
+    if (handled && options?.select) {
+      editor.focus();
+    }
+    return handled;
+  };
+
+  const deleteBlocksById = (marginBlockIds: string[]) => {
+    const editor = editorRef.current;
+    if (!editor || marginBlockIds.length === 0) {
+      return 0;
+    }
+
+    let deletedCount = 0;
+    editor.update(() => {
+      deletedCount = $deleteMarginaliaBlocksById(marginBlockIds);
+    });
+    return deletedCount;
   };
 
   const revealForManuscriptBlock = (manuscriptBlockId: string) => {
@@ -1319,16 +1574,18 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
       return;
     }
 
-    for (const element of linked) {
+    const highlighted = props.kind === "left" ? [linked[0]] : linked;
+
+    for (const element of highlighted) {
       element.dataset.linkedTarget = "true";
     }
-    linked[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    highlighted[0].scrollIntoView({ behavior: "smooth", block: "center" });
 
     if (revealTimeoutRef.current !== null) {
       window.clearTimeout(revealTimeoutRef.current);
     }
     revealTimeoutRef.current = window.setTimeout(() => {
-      for (const element of linked) {
+      for (const element of highlighted) {
         delete element.dataset.linkedTarget;
       }
       revealTimeoutRef.current = null;
@@ -1340,6 +1597,9 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
     () => ({
       insertBlock,
       revealForManuscriptBlock,
+      findBlockIdForLinkedManuscript,
+      findBlockIdsForLinkedManuscript,
+      getLinkedManuscriptBlockIdForBlock,
       focusBlockById,
       focusEditor: () => editorRef.current?.focus(),
       getLexicalJson: () => {
@@ -1376,7 +1636,12 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
       deleteCurrent: () => {
         editorRef.current?.dispatchCommand(DELETE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined);
       },
+      duplicateBlockById,
+      moveBlockBefore,
+      moveBlockAfter,
+      deleteBlocksById,
       goToLinkedManuscript,
+      normalizeLegacyLinkedDuplicates,
     }),
     [props.initialStateJson, props.kind],
   );
@@ -1425,6 +1690,7 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           onInsertLinkedBlock={props.onRequestCreateLinkedNote ?? (() => insertBlock(currentManuscriptBlockId))}
           canInsertLinkedBlock={Boolean(props.onRequestCreateLinkedNote) || Boolean(currentManuscriptBlockId)}
           onGoToLinkedManuscript={goToLinkedManuscript}
+          legacyDuplicateSummary={props.legacyDuplicateSummary}
         />
         <div className="lexical-scroll margin-scroll">
           <div className="editor-content-wrap margin-editor-content">

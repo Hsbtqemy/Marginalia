@@ -19,3 +19,13 @@ export function ensureBlockId(node: LexicalNode): string {
   $setState(node, manuscriptBlockIdState, created);
   return created;
 }
+
+export function setBlockId(node: LexicalNode, blockId: string): void {
+  $setState(node, manuscriptBlockIdState, blockId);
+}
+
+export function replaceBlockId(node: LexicalNode): string {
+  const created = newUuid();
+  $setState(node, manuscriptBlockIdState, created);
+  return created;
+}

@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deriveEditorialUnitProjection, EMPTY_EDITORIAL_UNIT_PROJECTION } from "./editorialUnits";
+import {
+  deriveEditorialUnitProjection,
+  EMPTY_EDITORIAL_UNIT_PROJECTION,
+  summarizeLegacyLeftDuplicates,
+} from "./editorialUnits";
 
 test("deriveEditorialUnitProjection keeps manuscript order and surfaces primary vs duplicate scholies from margin json", () => {
   const manuscriptJson = JSON.stringify({
@@ -121,4 +125,73 @@ test("deriveEditorialUnitProjection reports no mismatch when provided index matc
   });
 
   assert.deepEqual(projection.indexMismatchManuscriptBlockIds, []);
+});
+
+test("summarizeLegacyLeftDuplicates reports affected passages and keeps the primary scholie target", () => {
+  const projection = deriveEditorialUnitProjection({
+    manuscriptJson: JSON.stringify({
+      root: {
+        children: [
+          {
+            type: "paragraph",
+            $: { blockId: "m-1" },
+            children: [{ type: "text", text: "First block" }],
+          },
+          {
+            type: "paragraph",
+            $: { blockId: "m-2" },
+            children: [{ type: "text", text: "Second block" }],
+          },
+        ],
+      },
+    }),
+    leftMarginJson: JSON.stringify({
+      root: {
+        children: [
+          { type: "marginalia-block", marginBlockId: "left-1", linkedManuscriptBlockId: "m-1" },
+          { type: "marginalia-block", marginBlockId: "left-2", linkedManuscriptBlockId: "m-1" },
+          { type: "marginalia-block", marginBlockId: "left-3", linkedManuscriptBlockId: "m-2" },
+          { type: "marginalia-block", marginBlockId: "left-4", linkedManuscriptBlockId: "m-2" },
+          { type: "marginalia-block", marginBlockId: "left-5", linkedManuscriptBlockId: "m-2" },
+        ],
+      },
+    }),
+    leftLinksByManuscriptBlockId: {
+      "m-1": ["left-1"],
+      "m-2": ["left-3"],
+    },
+  });
+
+  assert.deepEqual(summarizeLegacyLeftDuplicates(projection), {
+    affectedUnitCount: 2,
+    duplicateScholieCount: 3,
+    firstAffectedManuscriptBlockId: "m-1",
+    firstPrimaryLeftMarginBlockId: "left-1",
+  });
+});
+
+test("summarizeLegacyLeftDuplicates returns null when no legacy duplicates remain", () => {
+  const projection = deriveEditorialUnitProjection({
+    manuscriptJson: JSON.stringify({
+      root: {
+        children: [
+          {
+            type: "paragraph",
+            $: { blockId: "m-1" },
+            children: [{ type: "text", text: "Only block" }],
+          },
+        ],
+      },
+    }),
+    leftMarginJson: JSON.stringify({
+      root: {
+        children: [{ type: "marginalia-block", marginBlockId: "left-1", linkedManuscriptBlockId: "m-1" }],
+      },
+    }),
+    leftLinksByManuscriptBlockId: {
+      "m-1": ["left-1"],
+    },
+  });
+
+  assert.equal(summarizeLegacyLeftDuplicates(projection), null);
 });

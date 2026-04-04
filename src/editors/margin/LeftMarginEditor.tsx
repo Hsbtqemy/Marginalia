@@ -12,6 +12,10 @@ interface LeftMarginEditorProps {
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
   onRequestCreateLinkedNote?: () => void;
   onFocusChange?: (focused: boolean) => void;
+  legacyDuplicateSummary?: {
+    affectedUnitCount: number;
+    duplicateScholieCount: number;
+  } | null;
 }
 
 export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEditorProps>(
@@ -30,6 +34,7 @@ export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEdi
         onNavigateToManuscriptBlock={props.onNavigateToManuscriptBlock}
         onRequestCreateLinkedNote={props.onRequestCreateLinkedNote}
         onFocusChange={props.onFocusChange}
+        legacyDuplicateSummary={props.legacyDuplicateSummary}
       />
     );
   },

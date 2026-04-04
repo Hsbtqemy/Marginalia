@@ -43,7 +43,10 @@ export function collectMarginBlockSummariesFromLexicalJson(lexicalJson: string):
   }
 }
 
-export function buildMarginLinkIndexFromLexicalJson(lexicalJson: string): Record<string, string[]> {
+export function buildMarginLinkIndexFromLexicalJson(
+  lexicalJson: string,
+  options?: { uniquePerManuscriptBlock?: boolean },
+): Record<string, string[]> {
   const index: Record<string, string[]> = {};
   const summaries = collectMarginBlockSummariesFromLexicalJson(lexicalJson);
 
@@ -54,6 +57,10 @@ export function buildMarginLinkIndexFromLexicalJson(lexicalJson: string): Record
 
     if (!index[summary.linkedManuscriptBlockId]) {
       index[summary.linkedManuscriptBlockId] = [];
+    }
+
+    if (options?.uniquePerManuscriptBlock && index[summary.linkedManuscriptBlockId].length > 0) {
+      continue;
     }
 
     index[summary.linkedManuscriptBlockId].push(summary.marginBlockId);

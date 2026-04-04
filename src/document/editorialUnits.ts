@@ -27,6 +27,13 @@ export interface EditorialUnitProjection {
   indexMismatchManuscriptBlockIds: string[];
 }
 
+export interface LegacyLeftDuplicateSummary {
+  affectedUnitCount: number;
+  duplicateScholieCount: number;
+  firstAffectedManuscriptBlockId: string | null;
+  firstPrimaryLeftMarginBlockId: string | null;
+}
+
 export const EMPTY_EDITORIAL_UNIT_PROJECTION: EditorialUnitProjection = {
   units: [],
   unlinkedLeftMarginBlockIds: [],
@@ -133,5 +140,39 @@ export function deriveEditorialUnitProjection(input: {
       derivedLeftLinksByManuscriptBlockId,
       input.leftLinksByManuscriptBlockId,
     ),
+  };
+}
+
+export function summarizeLegacyLeftDuplicates(
+  projection: EditorialUnitProjection,
+): LegacyLeftDuplicateSummary | null {
+  let affectedUnitCount = 0;
+  let duplicateScholieCount = 0;
+  let firstAffectedManuscriptBlockId: string | null = null;
+  let firstPrimaryLeftMarginBlockId: string | null = null;
+
+  for (const unit of projection.units) {
+    if (unit.duplicateLeftMarginBlockIds.length === 0) {
+      continue;
+    }
+
+    affectedUnitCount += 1;
+    duplicateScholieCount += unit.duplicateLeftMarginBlockIds.length;
+
+    if (firstAffectedManuscriptBlockId == null) {
+      firstAffectedManuscriptBlockId = unit.manuscriptBlockId;
+      firstPrimaryLeftMarginBlockId = unit.leftMarginBlockId;
+    }
+  }
+
+  if (affectedUnitCount === 0) {
+    return null;
+  }
+
+  return {
+    affectedUnitCount,
+    duplicateScholieCount,
+    firstAffectedManuscriptBlockId,
+    firstPrimaryLeftMarginBlockId,
   };
 }

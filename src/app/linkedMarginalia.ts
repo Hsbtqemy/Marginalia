@@ -8,6 +8,8 @@ interface LinkedMarginaliaSchedulerDeps {
   getCurrentDocumentId: () => string | null;
   resolveManuscriptBlockForLink: (manuscriptBlockId: string | null) => string | null;
   focusManuscriptBlockById: (manuscriptBlockId: string) => void;
+  findLinkedMarginBlockIdByManuscriptBlockId: (manuscriptBlockId: string) => string | null;
+  focusMarginBlockById: (marginBlockId: string) => void;
   insertLinkedMarginBlock: (manuscriptBlockId: string) => void;
   focusMarginEditor: () => void;
   reportError: (message: string, error: unknown) => void;
@@ -45,6 +47,14 @@ export function createLinkedMarginaliaScheduler(
 
     try {
       deps.focusManuscriptBlockById(resolvedBlockId);
+
+      const existingMarginBlockId = deps.findLinkedMarginBlockIdByManuscriptBlockId(resolvedBlockId);
+      if (existingMarginBlockId) {
+        deps.focusMarginBlockById(existingMarginBlockId);
+        deps.focusMarginEditor();
+        return;
+      }
+
       deps.insertLinkedMarginBlock(resolvedBlockId);
       deps.focusMarginEditor();
     } catch (error) {

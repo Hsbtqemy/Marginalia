@@ -1,6 +1,6 @@
 import {
+  $copyNode,
   $createParagraphNode,
-  $parseSerializedNode,
   $getRoot,
   $getSelection,
   $isElementNode,
@@ -78,11 +78,27 @@ function createBlock(payload: InsertMarginaliaBlockPayload): MarginaliaBlockNode
   return block;
 }
 
-function createEmptySiblingBlock(block: MarginaliaBlockNode): MarginaliaBlockNode {
+function createEmptySiblingBlock(
+  block: MarginaliaBlockNode,
+  options?: { preserveLinkedManuscriptBlockId?: boolean },
+): MarginaliaBlockNode {
   return $createMarginaliaBlockNode({
     kind: block.getKind(),
-    linkedManuscriptBlockId: block.getLinkedManuscriptBlockId(),
+    linkedManuscriptBlockId:
+      options?.preserveLinkedManuscriptBlockId === false ? null : block.getLinkedManuscriptBlockId(),
   });
+}
+
+function cloneMarginaliaSubtree<T extends LexicalNode>(node: T): T {
+  const clone = $copyNode(node);
+
+  if ($isElementNode(node) && $isElementNode(clone)) {
+    for (const child of node.getChildren()) {
+      clone.append(cloneMarginaliaSubtree(child));
+    }
+  }
+
+  return clone;
 }
 
 function findDirectChildInBlock(block: MarginaliaBlockNode, node: LexicalNode | null): ElementNode | null {
@@ -132,6 +148,10 @@ function inheritMissingLink(destination: MarginaliaBlockNode, source: Marginalia
   if (!destination.getLinkedManuscriptBlockId() && source.getLinkedManuscriptBlockId()) {
     destination.setLinkedManuscriptBlockId(source.getLinkedManuscriptBlockId());
   }
+}
+
+function enforcesSingleLinkedBlock(kind: MarginKind): boolean {
+  return kind === "left";
 }
 
 export function $ensureFirstMarginaliaBlock(kind: MarginKind): MarginaliaBlockNode {
@@ -192,6 +212,14 @@ export function $normalizeMarginaliaRoot(kind: MarginKind): void {
 }
 
 export function $insertMarginaliaBlock(payload: InsertMarginaliaBlockPayload): MarginaliaBlockNode {
+  if (payload.linkedManuscriptBlockId && enforcesSingleLinkedBlock(payload.kind)) {
+    const existing = $findFirstMarginaliaBlockByLinkedManuscriptId(payload.linkedManuscriptBlockId);
+    if (existing) {
+      existing.selectStart();
+      return existing;
+    }
+  }
+
   const current = $getCurrentMarginaliaBlockNode();
   const root = $getRoot();
   const block = createBlock(payload);
@@ -216,7 +244,128 @@ export function $findMarginaliaBlockById(marginBlockId: string): MarginaliaBlock
   return null;
 }
 
-export function $linkCurrentMarginaliaBlock(manuscriptBlockId: string | null): boolean {
+export function $findFirstMarginaliaBlockByLinkedManuscriptId(
+  manuscriptBlockId: string,
+  options?: { excludeMarginBlockId?: string | null },
+): MarginaliaBlockNode | null {
+  const root = $getRoot();
+  for (const child of root.getChildren()) {
+    if (
+      $isMarginaliaBlockNode(child) &&
+      child.getLinkedManuscriptBlockId() === manuscriptBlockId &&
+      child.getMarginBlockId() !== options?.excludeMarginBlockId
+    ) {
+      return child;
+    }
+  }
+  return null;
+}
+
+export function $findMarginaliaBlocksByLinkedManuscriptId(
+  manuscriptBlockId: string,
+  options?: { excludeMarginBlockIds?: string[] },
+): MarginaliaBlockNode[] {
+  const excludedIds = new Set(options?.excludeMarginBlockIds ?? []);
+  const matches: MarginaliaBlockNode[] = [];
+
+  for (const child of $getRoot().getChildren()) {
+    if (
+      $isMarginaliaBlockNode(child) &&
+      child.getLinkedManuscriptBlockId() === manuscriptBlockId &&
+      !excludedIds.has(child.getMarginBlockId())
+    ) {
+      matches.push(child);
+    }
+  }
+
+  return matches;
+}
+
+function positionMarginaliaBlock(
+  block: MarginaliaBlockNode,
+  options?: {
+    afterMarginBlockId?: string | null;
+    beforeMarginBlockId?: string | null;
+    select?: boolean;
+  },
+): MarginaliaBlockNode {
+  const shouldSelect = options?.select ?? true;
+  const afterBlock =
+    options?.afterMarginBlockId != null ? $findMarginaliaBlockById(options.afterMarginBlockId) : null;
+  const beforeBlock =
+    options?.beforeMarginBlockId != null ? $findMarginaliaBlockById(options.beforeMarginBlockId) : null;
+
+  if (afterBlock && afterBlock !== block) {
+    afterBlock.insertAfter(block, shouldSelect);
+  } else if (beforeBlock && beforeBlock !== block) {
+    beforeBlock.insertBefore(block, shouldSelect);
+  } else if (block.getParent() == null) {
+    $getRoot().append(block);
+  }
+
+  if (shouldSelect) {
+    block.selectStart();
+  }
+
+  return block;
+}
+
+export function $insertMarginaliaBlockAt(
+  payload: InsertMarginaliaBlockPayload,
+  options?: {
+    afterMarginBlockId?: string | null;
+    beforeMarginBlockId?: string | null;
+    select?: boolean;
+  },
+): MarginaliaBlockNode {
+  if (payload.linkedManuscriptBlockId && enforcesSingleLinkedBlock(payload.kind)) {
+    const existing = $findFirstMarginaliaBlockByLinkedManuscriptId(payload.linkedManuscriptBlockId);
+    if (existing) {
+      if (options?.select ?? true) {
+        existing.selectStart();
+      }
+      return existing;
+    }
+  }
+
+  const block = createBlock(payload);
+  return positionMarginaliaBlock(block, options);
+}
+
+export function $normalizeLegacyLinkedMarginaliaBlocks(kind: MarginKind): number {
+  if (!enforcesSingleLinkedBlock(kind)) {
+    return 0;
+  }
+
+  const seenLinkedManuscriptBlockIds = new Set<string>();
+  let normalizedCount = 0;
+
+  for (const child of $getRoot().getChildren()) {
+    if (!$isMarginaliaBlockNode(child)) {
+      continue;
+    }
+
+    const linkedManuscriptBlockId = child.getLinkedManuscriptBlockId();
+    if (!linkedManuscriptBlockId) {
+      continue;
+    }
+
+    if (seenLinkedManuscriptBlockIds.has(linkedManuscriptBlockId)) {
+      child.setLinkedManuscriptBlockId(null);
+      normalizedCount += 1;
+      continue;
+    }
+
+    seenLinkedManuscriptBlockIds.add(linkedManuscriptBlockId);
+  }
+
+  return normalizedCount;
+}
+
+export function $linkCurrentMarginaliaBlock(
+  manuscriptBlockId: string | null,
+  options?: { reuseExistingLinkedBlock?: boolean },
+): boolean {
   const current = $getCurrentMarginaliaBlockNode();
   if (!current) {
     return false;
@@ -224,6 +373,18 @@ export function $linkCurrentMarginaliaBlock(manuscriptBlockId: string | null): b
 
   if (current.getLinkedManuscriptBlockId() === manuscriptBlockId) {
     return true;
+  }
+
+  if (manuscriptBlockId && options?.reuseExistingLinkedBlock) {
+    const existing = $findFirstMarginaliaBlockByLinkedManuscriptId(manuscriptBlockId, {
+      excludeMarginBlockId: current.getMarginBlockId(),
+    });
+    if (existing) {
+      // Legacy documents may still contain duplicates; keep focus on the first linked scholie
+      // instead of creating a second active link from the left margin.
+      existing.selectStart();
+      return true;
+    }
   }
 
   current.setLinkedManuscriptBlockId(manuscriptBlockId);
@@ -286,11 +447,108 @@ export function $duplicateCurrentMarginaliaBlock(): boolean {
     return false;
   }
 
-  const duplicate = $parseSerializedNode(current.exportJSON()) as MarginaliaBlockNode;
+  const duplicate = cloneMarginaliaSubtree(current);
   duplicate.setMarginBlockId(newUuid());
-  current.insertAfter(duplicate, true);
-  duplicate.selectStart();
+  if (enforcesSingleLinkedBlock(current.getKind()) && duplicate.getLinkedManuscriptBlockId()) {
+    duplicate.setLinkedManuscriptBlockId(null);
+  }
+  positionMarginaliaBlock(duplicate, {
+    afterMarginBlockId: current.getMarginBlockId(),
+    select: true,
+  });
   return true;
+}
+
+export function $duplicateMarginaliaBlockById(
+  marginBlockId: string,
+  options?: {
+    linkedManuscriptBlockId?: string | null;
+    afterMarginBlockId?: string | null;
+    beforeMarginBlockId?: string | null;
+    select?: boolean;
+  },
+): MarginaliaBlockNode | null {
+  const current = $findMarginaliaBlockById(marginBlockId);
+  if (!current) {
+    return null;
+  }
+
+  const duplicate = cloneMarginaliaSubtree(current);
+  duplicate.setMarginBlockId(newUuid());
+
+  if (options?.linkedManuscriptBlockId !== undefined) {
+    duplicate.setLinkedManuscriptBlockId(options.linkedManuscriptBlockId);
+  } else if (enforcesSingleLinkedBlock(current.getKind()) && duplicate.getLinkedManuscriptBlockId()) {
+    duplicate.setLinkedManuscriptBlockId(null);
+  }
+
+  if (
+    enforcesSingleLinkedBlock(current.getKind()) &&
+    duplicate.getLinkedManuscriptBlockId() &&
+    $findFirstMarginaliaBlockByLinkedManuscriptId(duplicate.getLinkedManuscriptBlockId() ?? "", {
+      excludeMarginBlockId: current.getMarginBlockId(),
+    })
+  ) {
+    return $findFirstMarginaliaBlockByLinkedManuscriptId(duplicate.getLinkedManuscriptBlockId() ?? "");
+  }
+
+  return positionMarginaliaBlock(duplicate, {
+    afterMarginBlockId: options?.afterMarginBlockId ?? current.getMarginBlockId(),
+    beforeMarginBlockId: options?.beforeMarginBlockId,
+    select: options?.select,
+  });
+}
+
+export function $moveMarginaliaBlockBefore(
+  marginBlockId: string,
+  beforeMarginBlockId: string,
+  options?: { select?: boolean },
+): boolean {
+  const current = $findMarginaliaBlockById(marginBlockId);
+  const before = $findMarginaliaBlockById(beforeMarginBlockId);
+  if (!current || !before || current === before) {
+    return false;
+  }
+
+  before.insertBefore(current, options?.select ?? false);
+  if (options?.select) {
+    current.selectStart();
+  }
+  return true;
+}
+
+export function $moveMarginaliaBlockAfter(
+  marginBlockId: string,
+  afterMarginBlockId: string,
+  options?: { select?: boolean },
+): boolean {
+  const current = $findMarginaliaBlockById(marginBlockId);
+  const after = $findMarginaliaBlockById(afterMarginBlockId);
+  if (!current || !after || current === after) {
+    return false;
+  }
+
+  after.insertAfter(current, options?.select ?? false);
+  if (options?.select) {
+    current.selectStart();
+  }
+  return true;
+}
+
+export function $deleteMarginaliaBlocksById(marginBlockIds: string[]): number {
+  const targetIds = new Set(marginBlockIds);
+  let deletedCount = 0;
+
+  for (const child of [...$getRoot().getChildren()]) {
+    if (!$isMarginaliaBlockNode(child) || !targetIds.has(child.getMarginBlockId())) {
+      continue;
+    }
+
+    child.remove();
+    deletedCount += 1;
+  }
+
+  return deletedCount;
 }
 
 export function $splitCurrentMarginaliaBlock(): boolean {
@@ -306,7 +564,9 @@ export function $splitCurrentMarginaliaBlock(): boolean {
     return false;
   }
 
-  const newBlock = createEmptySiblingBlock(current);
+  const newBlock = createEmptySiblingBlock(current, {
+    preserveLinkedManuscriptBlockId: !enforcesSingleLinkedBlock(current.getKind()),
+  });
 
   if ($isListNode(directChild)) {
     const listItem = findListItemWithinDirectList(directChild, anchorNode);
@@ -399,7 +659,9 @@ export function registerMarginaliaCommands(editor: LexicalEditor, kind: MarginKi
     ({ manuscriptBlockId }) => {
       let handled = false;
       const updated = runUpdateSafely(() => {
-        handled = $linkCurrentMarginaliaBlock(manuscriptBlockId);
+        handled = $linkCurrentMarginaliaBlock(manuscriptBlockId, {
+          reuseExistingLinkedBlock: kind === "left",
+        });
       });
       return updated && handled;
     },

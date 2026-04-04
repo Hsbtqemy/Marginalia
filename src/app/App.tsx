@@ -5,7 +5,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { ThreePaneLayout } from "./layout/ThreePaneLayout";
 import { buildMenu } from "./menu/buildMenu";
 import { CommandPalette, type CommandPaletteItem } from "./CommandPalette";
-import { deriveEditorialUnitProjection } from "../document/editorialUnits";
+import { deriveEditorialUnitProjection, summarizeLegacyLeftDuplicates } from "../document/editorialUnits";
 import {
   createDocument,
   deleteDocument,
@@ -36,6 +36,7 @@ import { buildMarginLinkIndexFromLexicalJson } from "../editors/margin/marginali
 import { buildManuscriptExcerptIndexFromLexicalJson } from "../editors/manuscript/lexicalBlocks/indexing";
 import { buildPrintPreviewHtml } from "../utils/printPreview";
 import { debounce } from "../utils/debounce";
+import { createEditorialUnitCoordinator } from "./editorialUnitActions";
 import { createLinkedMarginaliaScheduler } from "./linkedMarginalia";
 import { releaseStuckPointerState } from "./pointerState";
 
@@ -173,7 +174,9 @@ export default function App() {
         rightMarginJson: bundle.rightMarginJson,
       });
       setDefaultPresetId(bundle.defaultPresetId);
-      setLeftLinksByManuscriptBlockId(buildMarginLinkIndexFromLexicalJson(bundle.leftMarginJson));
+      setLeftLinksByManuscriptBlockId(
+        buildMarginLinkIndexFromLexicalJson(bundle.leftMarginJson, { uniquePerManuscriptBlock: true }),
+      );
       setRightLinksByManuscriptBlockId(buildMarginLinkIndexFromLexicalJson(bundle.rightMarginJson));
       await persistPreference("lastDocumentId", documentId);
     },
@@ -260,7 +263,9 @@ export default function App() {
           rightMarginJson: bundle.rightMarginJson,
         });
         setDefaultPresetId(bundle.defaultPresetId);
-        setLeftLinksByManuscriptBlockId(buildMarginLinkIndexFromLexicalJson(bundle.leftMarginJson));
+        setLeftLinksByManuscriptBlockId(
+          buildMarginLinkIndexFromLexicalJson(bundle.leftMarginJson, { uniquePerManuscriptBlock: true }),
+        );
         setRightLinksByManuscriptBlockId(buildMarginLinkIndexFromLexicalJson(bundle.rightMarginJson));
         await loadedPrefs.set("lastDocumentId", initialDocumentId);
         await loadedPrefs.save();
@@ -372,6 +377,11 @@ export default function App() {
   useEffect(() => {
     setEditorialUnitProjection(editorialUnitProjection);
   }, [editorialUnitProjection, setEditorialUnitProjection]);
+
+  const legacyLeftDuplicateSummary = useMemo(
+    () => summarizeLegacyLeftDuplicates(editorialUnitProjection),
+    [editorialUnitProjection],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -580,6 +590,12 @@ export default function App() {
         focusManuscriptBlockById: (manuscriptBlockId) => {
           manuscriptEditorRef.current?.focusBlockById(manuscriptBlockId);
         },
+        findLinkedMarginBlockIdByManuscriptBlockId: (manuscriptBlockId) => {
+          return leftEditorRef.current?.findBlockIdForLinkedManuscript(manuscriptBlockId) ?? null;
+        },
+        focusMarginBlockById: (marginBlockId) => {
+          leftEditorRef.current?.focusBlockById(marginBlockId);
+        },
         insertLinkedMarginBlock: (manuscriptBlockId) => {
           leftEditorRef.current?.insertBlock(manuscriptBlockId);
         },
@@ -621,6 +637,140 @@ export default function App() {
 
   const handleNavigateToManuscriptBlock = useCallback((manuscriptBlockId: string) => {
     manuscriptEditorRef.current?.focusBlockById(manuscriptBlockId);
+  }, []);
+
+  const editorialUnitCoordinator = useMemo(
+    () =>
+      createEditorialUnitCoordinator({
+        getActivePane: () => activePane,
+        setActivePane,
+        getCurrentManuscriptBlockId: () => useAppStore.getState().currentManuscriptBlockId,
+        getCurrentLeftMarginBlockId: () => useAppStore.getState().leftCurrentBlockId,
+        listManuscriptBlockIds: () => manuscriptEditorRef.current?.listBlockIds() ?? [],
+        insertManuscriptBlockBefore: (blockId) =>
+          manuscriptEditorRef.current?.insertBlockBefore(blockId) ?? null,
+        insertManuscriptBlockAfter: (blockId) =>
+          manuscriptEditorRef.current?.insertBlockAfter(blockId) ?? null,
+        duplicateManuscriptBlock: (blockId) =>
+          manuscriptEditorRef.current?.duplicateBlock(blockId) ?? null,
+        moveManuscriptBlockUp: (blockId) =>
+          manuscriptEditorRef.current?.moveBlockUp(blockId) ?? null,
+        moveManuscriptBlockDown: (blockId) =>
+          manuscriptEditorRef.current?.moveBlockDown(blockId) ?? null,
+        deleteManuscriptBlock: (blockId) => manuscriptEditorRef.current?.deleteBlock(blockId) ?? null,
+        findMarginBlockIdsForLinkedManuscript: (manuscriptBlockId) =>
+          leftEditorRef.current?.findBlockIdsForLinkedManuscript(manuscriptBlockId) ?? [],
+        getLinkedManuscriptBlockIdForMarginBlock: (marginBlockId) =>
+          leftEditorRef.current?.getLinkedManuscriptBlockIdForBlock(marginBlockId) ?? null,
+        insertLinkedMarginBlock: (manuscriptBlockId, options) =>
+          leftEditorRef.current?.insertBlock(manuscriptBlockId, options) ?? null,
+        duplicateMarginBlock: (marginBlockId, options) =>
+          leftEditorRef.current?.duplicateBlockById(marginBlockId, options) ?? null,
+        moveMarginBlockBefore: (marginBlockId, beforeMarginBlockId, options) =>
+          leftEditorRef.current?.moveBlockBefore(marginBlockId, beforeMarginBlockId, options) ?? false,
+        moveMarginBlockAfter: (marginBlockId, afterMarginBlockId, options) =>
+          leftEditorRef.current?.moveBlockAfter(marginBlockId, afterMarginBlockId, options) ?? false,
+        deleteMarginBlocks: (marginBlockIds) =>
+          leftEditorRef.current?.deleteBlocksById(marginBlockIds) ?? 0,
+        focusManuscriptBlockById: (manuscriptBlockId) => {
+          manuscriptEditorRef.current?.focusBlockById(manuscriptBlockId);
+        },
+        focusManuscriptEditor: () => {
+          manuscriptEditorRef.current?.focusEditor();
+        },
+        focusMarginBlockById: (marginBlockId) => {
+          leftEditorRef.current?.focusBlockById(marginBlockId);
+        },
+        focusMarginEditor: () => {
+          leftEditorRef.current?.focusEditor();
+        },
+        reportError,
+      }),
+    [activePane, reportError],
+  );
+
+  const currentUnitActionsEnabled = editorialUnitCoordinator.canResolveCurrentUnit();
+
+  const handleCreateUnitBefore = useCallback(() => {
+    editorialUnitCoordinator.createUnitBefore();
+  }, [editorialUnitCoordinator]);
+
+  const handleCreateUnitAfter = useCallback(() => {
+    editorialUnitCoordinator.createUnitAfter();
+  }, [editorialUnitCoordinator]);
+
+  const handleCreateUnitBeforeBlock = useCallback(
+    (manuscriptBlockId: string) => {
+      editorialUnitCoordinator.createUnitBeforeBlock(manuscriptBlockId);
+    },
+    [editorialUnitCoordinator],
+  );
+
+  const handleCreateUnitAfterBlock = useCallback(
+    (manuscriptBlockId: string) => {
+      editorialUnitCoordinator.createUnitAfterBlock(manuscriptBlockId);
+    },
+    [editorialUnitCoordinator],
+  );
+
+  const handleCreateUnitAtStart = useCallback(() => {
+    editorialUnitCoordinator.createUnitAtStart();
+  }, [editorialUnitCoordinator]);
+
+  const handleQuickInsertUnit = useCallback(() => {
+    if (editorialUnitCoordinator.canResolveCurrentUnit()) {
+      editorialUnitCoordinator.createUnitAfter();
+      return;
+    }
+
+    editorialUnitCoordinator.createUnitAtEnd();
+  }, [editorialUnitCoordinator]);
+
+  const handleDuplicateCurrentUnit = useCallback(() => {
+    editorialUnitCoordinator.duplicateCurrentUnit();
+  }, [editorialUnitCoordinator]);
+
+  const handleMoveCurrentUnitUp = useCallback(() => {
+    editorialUnitCoordinator.moveCurrentUnitUp();
+  }, [editorialUnitCoordinator]);
+
+  const handleMoveCurrentUnitDown = useCallback(() => {
+    editorialUnitCoordinator.moveCurrentUnitDown();
+  }, [editorialUnitCoordinator]);
+
+  const handleDeleteCurrentUnit = useCallback(() => {
+    editorialUnitCoordinator.deleteCurrentUnit();
+  }, [editorialUnitCoordinator]);
+
+  const quickInsertUnitTitle =
+    editorialUnitProjection.units.length === 0
+      ? "Unit: start first passage"
+      : currentUnitActionsEnabled
+        ? "Unit: add next passage"
+        : "Unit: append passage at end";
+
+  const handleReviewLegacyLeftDuplicates = useCallback(() => {
+    const primaryMarginBlockId = legacyLeftDuplicateSummary?.firstPrimaryLeftMarginBlockId;
+    const manuscriptBlockId = legacyLeftDuplicateSummary?.firstAffectedManuscriptBlockId;
+    if (!primaryMarginBlockId || !manuscriptBlockId) {
+      return;
+    }
+
+    manuscriptEditorRef.current?.focusBlockById(manuscriptBlockId);
+    leftEditorRef.current?.focusBlockById(primaryMarginBlockId);
+    setActivePane("left");
+  }, [legacyLeftDuplicateSummary]);
+
+  const handleNormalizeLegacyLeftDuplicates = useCallback(() => {
+    const normalizedCount = leftEditorRef.current?.normalizeLegacyLinkedDuplicates() ?? 0;
+    if (normalizedCount === 0) {
+      return;
+    }
+
+    setStatusMessage(
+      `${normalizedCount} duplicate ${normalizedCount > 1 ? "scholies were" : "scholie was"} detached as free scholies. The first linked scholie remains primary for each passage.`,
+    );
+    setActivePane("left");
   }, []);
 
   const handleOpenPrintPreview = useCallback(() => {
@@ -782,6 +932,62 @@ export default function App() {
         onSelect: () => rightEditorRef.current?.focusEditor(),
       },
       {
+        id: "unit.quick-insert",
+        title: quickInsertUnitTitle,
+        section: "Units",
+        shortcut: "Ctrl/Cmd+Alt+Enter",
+        keywords: ["add create insert unit passage scholie empty document end next"],
+        onSelect: handleQuickInsertUnit,
+      },
+      {
+        id: "unit.insert-before",
+        title: "Unit: insert before current passage",
+        section: "Units",
+        disabled: !currentUnitActionsEnabled,
+        keywords: ["passage block insert before unit scholie"],
+        onSelect: handleCreateUnitBefore,
+      },
+      {
+        id: "unit.insert-after",
+        title: "Unit: insert after current passage",
+        section: "Units",
+        disabled: !currentUnitActionsEnabled,
+        keywords: ["passage block insert after unit scholie"],
+        onSelect: handleCreateUnitAfter,
+      },
+      {
+        id: "unit.duplicate",
+        title: "Unit: duplicate current passage",
+        section: "Units",
+        disabled: !currentUnitActionsEnabled,
+        keywords: ["copy clone block passage scholie"],
+        onSelect: handleDuplicateCurrentUnit,
+      },
+      {
+        id: "unit.move-up",
+        title: "Unit: move current passage up",
+        section: "Units",
+        disabled: !currentUnitActionsEnabled,
+        keywords: ["reorder block passage previous scholie"],
+        onSelect: handleMoveCurrentUnitUp,
+      },
+      {
+        id: "unit.move-down",
+        title: "Unit: move current passage down",
+        section: "Units",
+        disabled: !currentUnitActionsEnabled,
+        keywords: ["reorder block passage next scholie"],
+        onSelect: handleMoveCurrentUnitDown,
+      },
+      {
+        id: "unit.delete",
+        title: "Unit: delete current passage",
+        section: "Units",
+        disabled: !currentUnitActionsEnabled,
+        keywords: ["remove trash block passage scholie"],
+        onSelect: handleDeleteCurrentUnit,
+      },
+      {
         id: "left.new-linked",
         title: "Scholies: add for current passage",
         section: "Scholies",
@@ -789,6 +995,14 @@ export default function App() {
         shortcut: "Ctrl/Cmd+Alt+N",
         keywords: ["scholie passage commentary anchor manuscript"],
         onSelect: () => handleCreateLinkedMarginalia(currentManuscriptBlockId),
+      },
+      {
+        id: "left.normalize-legacy-duplicates",
+        title: "Scholies: normalize legacy duplicates",
+        section: "Scholies",
+        disabled: !legacyLeftDuplicateSummary,
+        keywords: ["legacy duplicate normalize cleanup detach scholie"],
+        onSelect: handleNormalizeLegacyLeftDuplicates,
       },
       {
         id: "left.duplicate",
@@ -883,13 +1097,28 @@ export default function App() {
     ],
     [
       currentManuscriptBlockId,
+      currentUnitActionsEnabled,
+      editorialUnitProjection.units.length,
+      handleCreateUnitAfterBlock,
+      handleCreateUnitAfter,
+      handleCreateUnitAtStart,
+      handleCreateUnitBeforeBlock,
+      handleCreateUnitBefore,
       handleDeleteDocument,
+      handleDeleteCurrentUnit,
+      handleDuplicateCurrentUnit,
+      handleMoveCurrentUnitDown,
+      handleMoveCurrentUnitUp,
       handleNewDocument,
       handleOpenPrintPreview,
+      handleQuickInsertUnit,
       handleRenameDocument,
       handleTogglePagePreview,
       handleToggleRightPane,
+      quickInsertUnitTitle,
       handleCreateLinkedMarginalia,
+      handleNormalizeLegacyLeftDuplicates,
+      legacyLeftDuplicateSummary,
       leftCurrentBlockId,
       pagePreview,
       rightCurrentBlockId,
@@ -1020,6 +1249,26 @@ export default function App() {
         </div>
       ) : null}
 
+      {legacyLeftDuplicateSummary ? (
+        <div className="status-banner status-banner-warning" role="status">
+          <span>
+            Legacy scholies detected: {legacyLeftDuplicateSummary.duplicateScholieCount} duplicate
+            {legacyLeftDuplicateSummary.duplicateScholieCount > 1 ? " scholies" : " scholie"} across{" "}
+            {legacyLeftDuplicateSummary.affectedUnitCount} passage
+            {legacyLeftDuplicateSummary.affectedUnitCount > 1 ? "s" : ""}. The first scholie stays
+            primary for each passage; you can detach the extras as free scholies now.
+          </span>
+          <div className="status-banner-actions">
+            <button type="button" className="ghost-button" onClick={handleReviewLegacyLeftDuplicates}>
+              Review Primary
+            </button>
+            <button type="button" className="ghost-button" onClick={handleNormalizeLegacyLeftDuplicates}>
+              Normalize
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <ThreePaneLayout
         rightVisible={rightPaneVisible}
         activePane={activePane}
@@ -1036,6 +1285,7 @@ export default function App() {
             onLinkIndexChange={setLeftLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}
             onRequestCreateLinkedNote={() => handleCreateLinkedMarginalia(currentManuscriptBlockId)}
+            legacyDuplicateSummary={legacyLeftDuplicateSummary}
             onFocusChange={(focused) => {
               if (focused) {
                 setActivePane("left");
@@ -1053,6 +1303,16 @@ export default function App() {
             onCurrentBlockIdChange={setCurrentManuscriptBlockId}
             onCreateLinkedMarginalia={handleCreateLinkedMarginalia}
             onRevealMarginalia={handleRevealMarginalia}
+            onInsertUnitBefore={handleCreateUnitBefore}
+            onInsertUnitAfter={handleCreateUnitAfter}
+            onInsertUnitBeforeBlock={handleCreateUnitBeforeBlock}
+            onInsertUnitAfterBlock={handleCreateUnitAfterBlock}
+            onInsertUnitAtStart={handleCreateUnitAtStart}
+            onQuickInsertUnit={handleQuickInsertUnit}
+            onDuplicateUnit={handleDuplicateCurrentUnit}
+            onMoveUnitUp={handleMoveCurrentUnitUp}
+            onMoveUnitDown={handleMoveCurrentUnitDown}
+            onDeleteUnit={handleDeleteCurrentUnit}
             onFocusChange={(focused) => {
               if (focused) {
                 setActivePane("center");

@@ -9,95 +9,100 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 - Toute tache qui touche a l'export ou a la persistance doit inclure des tests.
 - Toute tache qui touche a Tauri doit inclure une verification manuelle Windows au minimum.
 - Tant que l'item `SEC-01` n'est pas traite, eviter d'etendre les usages HTML/libres dans l'app.
-- Tant que `SCH-03` n'est pas traite, ne pas pousser de refonte purement cosmetique de la marge gauche.
-- Tant que `SCH-02` et `SCH-03` ne sont pas traites, `UX-02` et `UX-03` restent des chantiers d'exploration encadree, pas des refontes a stabiliser.
+- Tant que `MAN-01` et `PAIR-01` ne sont pas traites, ne pas figer une refonte purement cosmetique de la marge gauche.
+- Tant que `MAN-01`, `PAIR-01` et `PAIR-02` ne sont pas traites, `UX-02` et `UX-03` restent des chantiers d'exploration encadree, pas des refontes a stabiliser.
 
 ## Vue d'ensemble
 
-| ID | Priorite | Theme | Titre | Effort | Risque |
-|---|---|---|---|---|---|
-| SEC-01 | P0 | Securite | Durcir l'aperçu d'impression et la CSP Tauri | M | Eleve |
-| PERF-01 | P0 | Performance | Debouncer la persistance des preferences UI | S | Moyen |
-| REL-01 | P0 | Robustesse | Ajouter une gestion d'erreur utilisateur sur bootstrap/save/export | M | Eleve |
-| DATA-01 | P1 | Donnees | Rendre `createDocument` transactionnel | S | Moyen |
-| SEC-02 | P1 | Securite | Reduire les permissions Tauri au strict necessaire | S | Moyen |
-| DATA-02 | P1 | Donnees | Fiabiliser le systeme de migrations | M | Moyen |
-| QA-01 | P1 | Qualite | Poser un socle de tests automatise | M | Eleve |
-| ARCH-01 | P0 | Architecture | Formaliser le modele editorial par unites | M | Eleve |
-| SCH-01 | P0 | Produit/UX | Requalifier la marge gauche en scholies | M | Eleve |
-| SCH-02 | P0 | Architecture | Deriver un index d'unites depuis le modele actuel | M | Eleve |
-| SCH-03 | P0 | Robustesse | Garantir une seule scholie gauche par bloc manuscrit | M | Eleve |
-| MAN-01 | P0 | Editeur | Ajouter les operations de bloc cote manuscrit | L | Eleve |
-| PAIR-01 | P0 | Editeur | Coordonner les actions au niveau unite | L | Eleve |
-| PAIR-02 | P0 | UX | Introduire l'insertion explicite entre unites | M | Moyen |
-| PAIR-03 | P1 | UX | Autoriser la scholie vide, reduite ou developpee | S | Faible |
-| LAY-01 | P1 | UX/UI | Reequilibrer la grille en faveur du manuscrit | M | Moyen |
-| SAFE-01 | P1 | Robustesse | Garder un reorder fiable sans drag souris | S | Moyen |
-| MODEL-01 | P1 | Donnees | Introduire un modele canonique de document par unites | L | Eleve |
-| MODEL-02 | P1 | Donnees | Migrer les documents existants vers le modele d'unites | L | Eleve |
-| QA-02 | P1 | Qualite | Couvrir les invariants du modele scholies | M | Eleve |
-| EXP-01 | P1 | Produit | Documenter explicitement les limites de l'export DOCX | S | Faible |
-| EXP-02 | P2 | Export | Augmenter la fidelite de l'export DOCX | L | Moyen |
-| EXP-03 | P2 | Export | Aligner l'export avec les unites editoriales | M | Moyen |
-| UX-01 | P2 | UX | Remplacer `prompt/confirm` par des modales natives de l'app | M | Faible |
-| UX-02 | P1 | UX/UI | Recentrer l'app sur l'ecriture par unites | L | Eleve |
-| UX-03 | P1 | UX/UI | Transformer la marge gauche en appareil de scholies | L | Eleve |
-| UX-04 | P1 | UX/UI | Reduire le bruit permanent et rendre l'aide contextuelle | M | Moyen |
-| UX-05 | P2 | UX/UI | Installer une direction visuelle editoriale complete | L | Moyen |
-| UX-06 | P2 | UX/UI | Recomposer la topbar et la navigation document | M | Moyen |
-| DX-01 | P2 | DX | Corriger les details de finition du projet | S | Faible |
+
+| ID       | Priorite | Theme        | Titre                                                              | Effort | Risque |
+| -------- | -------- | ------------ | ------------------------------------------------------------------ | ------ | ------ |
+| SEC-01   | P0       | Securite     | Durcir l'aperçu d'impression et la CSP Tauri                       | M      | Eleve  |
+| PERF-01  | P0       | Performance  | Debouncer la persistance des preferences UI                        | S      | Moyen  |
+| REL-01   | P0       | Robustesse   | Ajouter une gestion d'erreur utilisateur sur bootstrap/save/export | M      | Eleve  |
+| DATA-01  | P1       | Donnees      | Rendre `createDocument` transactionnel                             | S      | Moyen  |
+| SEC-02   | P1       | Securite     | Reduire les permissions Tauri au strict necessaire                 | S      | Moyen  |
+| DATA-02  | P1       | Donnees      | Fiabiliser le systeme de migrations                                | M      | Moyen  |
+| QA-01    | P1       | Qualite      | Poser un socle de tests automatise                                 | M      | Eleve  |
+| ARCH-01  | P0       | Architecture | Formaliser le modele editorial par unites                          | M      | Eleve  |
+| SCH-01   | P0       | Produit/UX   | Requalifier la marge gauche en scholies                            | M      | Eleve  |
+| SCH-02   | P0       | Architecture | Deriver un index d'unites depuis le modele actuel                  | M      | Eleve  |
+| SCH-03   | P0       | Robustesse   | Garantir une seule scholie gauche par bloc manuscrit               | M      | Eleve  |
+| SCH-04   | P1       | Robustesse   | Signaler et normaliser les doublons de scholies herites            | M      | Moyen  |
+| MAN-01   | P0       | Editeur      | Ajouter les operations de bloc cote manuscrit                      | L      | Eleve  |
+| PAIR-01  | P0       | Editeur      | Coordonner les actions au niveau unite                             | L      | Eleve  |
+| PAIR-02  | P0       | UX           | Introduire l'insertion explicite entre unites                      | M      | Moyen  |
+| PAIR-03  | P1       | UX           | Autoriser la scholie vide, reduite ou developpee                   | S      | Faible |
+| LAY-01   | P1       | UX/UI        | Reequilibrer la grille en faveur du manuscrit                      | M      | Moyen  |
+| SAFE-01  | P1       | Robustesse   | Garder un reorder fiable sans drag souris                          | S      | Moyen  |
+| MODEL-01 | P1       | Donnees      | Introduire un modele canonique de document par unites              | L      | Eleve  |
+| MODEL-02 | P1       | Donnees      | Migrer les documents existants vers le modele d'unites             | L      | Eleve  |
+| QA-02    | P1       | Qualite      | Couvrir les invariants du modele scholies                          | M      | Eleve  |
+| EXP-01   | P1       | Produit      | Documenter explicitement les limites de l'export DOCX              | S      | Faible |
+| EXP-02   | P2       | Export       | Augmenter la fidelite de l'export DOCX                             | L      | Moyen  |
+| EXP-03   | P2       | Export       | Aligner l'export avec les unites editoriales                       | M      | Moyen  |
+| UX-01    | P2       | UX           | Remplacer `prompt/confirm` par des modales natives de l'app        | M      | Faible |
+| UX-02    | P1       | UX/UI        | Recentrer l'app sur l'ecriture par unites                          | L      | Eleve  |
+| UX-03    | P1       | UX/UI        | Transformer la marge gauche en appareil de scholies                | L      | Eleve  |
+| UX-04    | P1       | UX/UI        | Reduire le bruit permanent et rendre l'aide contextuelle           | M      | Moyen  |
+| UX-05    | P2       | UX/UI        | Installer une direction visuelle editoriale complete               | L      | Moyen  |
+| UX-06    | P2       | UX/UI        | Recomposer la topbar et la navigation document                     | M      | Moyen  |
+| DX-01    | P2       | DX           | Corriger les details de finition du projet                         | S      | Faible |
+
 
 ## Etat d'avancement (2026-04-04)
 
-| ID | Statut |
-|---|---|
-| SEC-01 | done |
-| PERF-01 | done |
-| REL-01 | done |
-| DATA-01 | done |
-| SEC-02 | done |
-| DATA-02 | done |
-| QA-01 | done |
-| ARCH-01 | done |
-| SCH-01 | done |
-| SCH-02 | done |
-| SCH-03 | todo |
-| MAN-01 | todo |
-| PAIR-01 | todo |
-| PAIR-02 | todo |
-| PAIR-03 | todo |
-| LAY-01 | todo |
-| SAFE-01 | todo |
-| MODEL-01 | todo |
-| MODEL-02 | todo |
-| QA-02 | todo |
-| EXP-01 | done |
-| EXP-02 | todo |
-| EXP-03 | todo |
-| UX-01 | done |
-| UX-02 | in progress |
-| UX-03 | in progress |
-| UX-04 | in progress |
-| UX-05 | in progress |
-| UX-06 | in progress |
-| DX-01 | done |
+
+| ID       | Statut      |
+| -------- | ----------- |
+| SEC-01   | done        |
+| PERF-01  | done        |
+| REL-01   | done        |
+| DATA-01  | done        |
+| SEC-02   | done        |
+| DATA-02  | done        |
+| QA-01    | done        |
+| ARCH-01  | done        |
+| SCH-01   | done        |
+| SCH-02   | done        |
+| SCH-03   | done        |
+| SCH-04   | done        |
+| MAN-01   | done        |
+| PAIR-01  | done        |
+| PAIR-02  | done        |
+| PAIR-03  | done        |
+| LAY-01   | todo        |
+| SAFE-01  | todo        |
+| MODEL-01 | todo        |
+| MODEL-02 | todo        |
+| QA-02    | todo        |
+| EXP-01   | done        |
+| EXP-02   | todo        |
+| EXP-03   | todo        |
+| UX-01    | done        |
+| UX-02    | in progress |
+| UX-03    | in progress |
+| UX-04    | in progress |
+| UX-05    | in progress |
+| UX-06    | in progress |
+| DX-01    | done        |
+
 
 ### Resume
 
-- done: 13
+- done: 19
 - in progress: 5
-- todo: 11
+- todo: 6
 - hors backlog initial (critique): `New linked note` est durci et couvert par tests; le resize pointeur a replanete lors de la validation manuelle Windows/Tauri du 2026-04-02 et reste desactive en attendant une correction de fond
-- reorientation produit le 2026-04-04: `ARCH-01` est formalise; `UX-02`, `UX-03` et une partie de `UX-04` sont maintenant executes via le programme `scholies` ci-dessous
+- reorientation produit le 2026-04-04: `ARCH-01` est formalise; `SCH-03` verrouille maintenant l'invariant `1 bloc manuscrit = 1 scholie gauche max` pour les nouvelles actions; `MAN-01` dote le manuscrit de primitives de structure par bloc; `PAIR-01` centralise maintenant les actions d'unite `bloc + scholie`; `PAIR-02` rend visible l'insertion explicite entre unites, y compris sur document vide; `PAIR-03` autorise maintenant une scholie liee vide, reduite ou developpee sans schema persistant supplementaire; `UX-02`, `UX-03` et une partie de `UX-04` sont maintenant executes via le programme `scholies` ci-dessous
 
 ### Reste a faire priorise
 
-1. `SCH-03`: implementer l'invariant restant du cadre editorial fixe par `ARCH-01` avant de pousser plus loin le redesign.
-2. `MAN-01`, `PAIR-01`, `PAIR-02`, `PAIR-03`, `SAFE-01`: faire passer l'app d'un manuscrit continu annote a une suite d'unites `bloc + scholie`.
-3. `LAY-01`, `UX-04`, `UX-05`, `UX-06`: retendre la hierarchie visuelle et la chrome autour du nouveau modele.
-4. `MODEL-01`, `MODEL-02`, `QA-02`: basculer la persistance et la couverture de tests vers le modele d'unites une fois l'UX validee.
-5. `EXP-03`, puis `EXP-02`: aligner l'export avec les unites editoriales avant d'augmenter la fidelite DOCX.
-6. Hors backlog initial critique: corriger le crash du resize pointeur sous Windows/Tauri, puis revalider les scenarios resize, changement de document et `New linked note`.
+1. `SAFE-01`: rendre le reorder fiable sans dependre du drag souris.
+2. `LAY-01`, `UX-04`, `UX-05`, `UX-06`: retendre la hierarchie visuelle et la chrome autour du nouveau modele.
+3. `MODEL-01`, `MODEL-02`, `QA-02`: basculer la persistance et la couverture de tests vers le modele d'unites une fois l'UX validee.
+4. `EXP-03`, puis `EXP-02`: aligner l'export avec les unites editoriales avant d'augmenter la fidelite DOCX.
+5. Hors backlog initial critique: corriger le crash du resize pointeur sous Windows/Tauri, puis revalider les scenarios resize, changement de document et `New linked note`.
 
 ---
 
@@ -114,41 +119,41 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 **CRIT-02 - Resize pointeur**
 
 1. Resize gauche, relacher dans la fenetre
-   - attendu: la taille change
-   - attendu: le curseur revient a la normale apres relachement
-   - attendu: tous les clics restent fonctionnels
-   - resultat 2026-04-02: KO, l'app replante comme lors de la passe precedente; le resize pointeur reste desactive apres rollback de securite
+  - attendu: la taille change
+  - attendu: le curseur revient a la normale apres relachement
+  - attendu: tous les clics restent fonctionnels
+  - resultat 2026-04-02: KO, l'app replante comme lors de la passe precedente; le resize pointeur reste desactive apres rollback de securite
 2. Resize gauche, relacher hors fenetre
-   - attendu: aucun etat bloque au retour dans la fenetre
-   - attendu: le curseur n'est pas fige en `col-resize`
+  - attendu: aucun etat bloque au retour dans la fenetre
+  - attendu: le curseur n'est pas fige en `col-resize`
 3. Resize droite, puis `Alt+Tab`
-   - attendu: retour dans l'app sans gel d'input
-   - attendu: les panneaux restent interactifs
+  - attendu: retour dans l'app sans gel d'input
+  - attendu: les panneaux restent interactifs
 4. Resize puis `Escape`
-   - attendu: fin immediate du resize
-   - attendu: aucune capture pointeur residuelle visible
+  - attendu: fin immediate du resize
+  - attendu: aucune capture pointeur residuelle visible
 5. Resize puis changement de document
-   - attendu: changement de document normal
-   - attendu: aucun panneau ne reste dans un etat de resize
+  - attendu: changement de document normal
+  - attendu: aucun panneau ne reste dans un etat de resize
 
 **CRIT-03 - `New linked note`**
 
 1. Depuis une selection manuscrit existante
-   - action: declencher `New linked note`
-   - attendu: une seule note liee est creee
-   - attendu: elle pointe vers le bon block manuscrit
-   - attendu: le focus final est dans la note
+  - action: declencher `New linked note`
+  - attendu: une seule note liee est creee
+  - attendu: elle pointe vers le bon block manuscrit
+  - attendu: le focus final est dans la note
 2. Sans block manuscrit courant clair
-   - action: declencher `New linked note`
-   - attendu: un passage manuscrit est cree ou reutilise une seule fois
-   - attendu: pas de doublon manuscrit / note
+  - action: declencher `New linked note`
+  - attendu: un passage manuscrit est cree ou reutilise une seule fois
+  - attendu: pas de doublon manuscrit / note
 3. Declenchement suivi d'un changement de document
-   - action: lancer `New linked note`, puis changer immediatement de document
-   - attendu: rien n'est cree dans le mauvais document
-   - attendu: aucun freeze ni erreur visible
+  - action: lancer `New linked note`, puis changer immediatement de document
+  - attendu: rien n'est cree dans le mauvais document
+  - attendu: aucun freeze ni erreur visible
 4. Declenchement via plusieurs entrees
-   - action: tester au minimum toolbar et palette de commandes
-   - attendu: meme comportement et meme resultat final
+  - action: tester au minimum toolbar et palette de commandes
+  - attendu: meme comportement et meme resultat final
 
 **Critere de cloture**
 
@@ -183,7 +188,7 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 ### Ordre recommande
 
 1. Implementer le vocabulaire et les invariants a partir de `ARCH-01`: `SCH-01`, `SCH-02`, `SCH-03`.
-2. Introduire les operations de structure cote manuscrit puis au niveau unite: `MAN-01`, `PAIR-01`, `PAIR-02`, `PAIR-03`.
+2. Capitaliser sur les operations de structure cote manuscrit pour introduire les actions niveau unite: `PAIR-01`, `PAIR-02`, `PAIR-03`.
 3. Recomposer l'interface autour des unites et de la lecture: `LAY-01`, `UX-04`, `UX-06`, `UX-05`.
 4. Seulement apres validation manuelle du nouveau comportement, basculer la persistance: `MODEL-01`, `MODEL-02`.
 5. Fermer avec `QA-02` et `EXP-03`, puis reprendre `EXP-02`.
@@ -270,20 +275,20 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 1. Figer les invariants fonctionnels du couple `bloc principal + scholie`.
 2. Definir ce qui est autorise ou non:
-   - maximum une scholie gauche par bloc manuscrit;
-   - scholie gauche vide autorisee;
-   - insertion explicite entre deux unites;
-   - suppression/deplacement/duplication au niveau unite.
+  - maximum une scholie gauche par bloc manuscrit;
+  - scholie gauche vide autorisee;
+  - insertion explicite entre deux unites;
+  - suppression/deplacement/duplication au niveau unite.
 3. Decider le role du panneau droit pendant la transition:
-   - annexe de sources;
-   - citations;
-   - ou simple panneau secondaire non structurel.
+  - annexe de sources;
+  - citations;
+  - ou simple panneau secondaire non structurel.
 4. Lister les ecrans et commandes a re-scoper: toolbar manuscrit, toolbar marge, palette, topbar, placeholders.
 
 **Definition of done**
 
 - Les invariants sont documentes dans ce backlog et servent de reference.
-- Les nouveaux tickets `SCH-*`, `PAIR-*`, `MODEL-*` sont valides par rapport a ces invariants.
+- Les nouveaux tickets `SCH-`*, `PAIR-*`, `MODEL-*` sont valides par rapport a ces invariants.
 - Les non-objectifs et cas limites principaux sont explicites.
 - Les tickets UX ouverts n'entrent pas en contradiction avec ce cadre.
 
@@ -311,11 +316,11 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Revoir le vocabulaire UI:
-   - remplacer `New Note`, `Free note`, `Linked note` par un lexique coherent avec les scholies.
+  - remplacer `New Note`, `Free note`, `Linked note` par un lexique coherent avec les scholies.
 2. Revoir les placeholders et textes de guidage dans `ManuscriptEditor` et `MarginEditorBase`.
 3. Distinguer clairement:
-   - scholie associee a un bloc;
-   - annexe libre eventuelle, si elle subsiste pendant la transition.
+  - scholie associee a un bloc;
+  - annexe libre eventuelle, si elle subsiste pendant la transition.
 4. Ajouter un marqueur discret d'association au bloc source sans rebasculer vers une "carte" riche en chrome.
 
 **Definition of done**
@@ -348,15 +353,15 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Introduire un helper de projection qui reconstitue des unites a partir de:
-   - `manuscriptJson`;
-   - `leftMarginJson`;
-   - `leftLinksByManuscriptBlockId`.
+  - `manuscriptJson`;
+  - `leftMarginJson`;
+  - `leftLinksByManuscriptBlockId`.
 2. Definir la forme de cette projection:
-   - `unitId`;
-   - `manuscriptBlockId`;
-   - `leftMarginBlockId | null`;
-   - ordre;
-   - extrait ou meta utiles a l'UI.
+  - `unitId`;
+  - `manuscriptBlockId`;
+  - `leftMarginBlockId | null`;
+  - ordre;
+  - extrait ou meta utiles a l'UI.
 3. Brancher cette projection dans `App.tsx` ou dans un module derive dedie, sans casser le store existant.
 4. Documenter clairement que cette projection reste transitoire tant que `MODEL-01` n'est pas traite.
 
@@ -374,9 +379,19 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### SCH-03 - Garantir une seule scholie gauche par bloc manuscrit
 
+**Statut**
+
+- done le 2026-04-04
+- fait:
+  - le scheduler `New linked note` reutilise la scholie gauche existante avant tout insert;
+  - les commandes d'insertion et de lien cote marge gauche reutilisent la premiere scholie existante au lieu de creer un doublon;
+  - la duplication d'une scholie gauche liee detache la copie pour preserver l'invariant d'unicite;
+  - la lecture legacy suit la regle `premiere scholie = primaire` sans crash;
+  - des tests couvrent le scheduler, les commandes de marge et le changement rapide de document.
+
 **Pourquoi**
 
-- Le flux `New linked note` cree aujourd'hui une note liee, mais ne garantit pas encore le modele `1 bloc = 1 scholie gauche max`.
+- Le flux `New linked note` pouvait encore creer un doublon de scholie gauche pour un meme bloc manuscrit.
 - Sans cet invariant, toute UI par unites restera fragile.
 
 **Objectif**
@@ -387,21 +402,27 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 1. Modifier `createLinkedMarginaliaScheduler` et les commandes de marge pour reutiliser une scholie existante au lieu de creer un doublon.
 2. Definir le comportement si plusieurs scholies liees existent deja sur un document ancien:
-   - ouvrir la premiere;
-   - signaler l'anomalie;
-   - ou lancer une normalisation.
+  - ouvrir la premiere;
+  - signaler l'anomalie;
+  - ou lancer une normalisation.
 3. Ajouter une normalisation de lecture pour les documents herites si necessaire.
 4. Couvrir les cas suivants:
-   - creation repetee depuis la toolbar;
-   - creation via palette;
-   - changement rapide de document;
-   - document ancien avec doublons.
+  - creation repetee depuis la toolbar;
+  - creation via palette;
+  - changement rapide de document;
+  - document ancien avec doublons.
 
 **Definition of done**
 
 - `New linked note` ne cree plus de doublon gauche pour un meme `blockId`.
 - Un document ancien avec doublons ne plante pas et suit une regle definie.
 - Les tests couvrent cet invariant.
+
+**Ce qui reste hors de ce ticket**
+
+- La signalisation explicite des doublons herites cote produit.
+- La normalisation persistante des doublons herites dans le JSON ou lors d'une migration.
+- Ces points sont deplaces dans `SCH-04`.
 
 **Dependances**
 
@@ -410,7 +431,60 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ---
 
+### SCH-04 - Signaler et normaliser les doublons de scholies herites
+
+**Statut**
+
+- done le 2026-04-04
+- fait:
+  - la projection derivee expose un resume des doublons legacy par unite;
+  - l'app affiche un signal produit explicite quand des doublons de scholies herites sont detectes;
+  - la marge gauche affiche un indicateur dedie `Legacy duplicates`;
+  - la strategie transitoire est rendue visible: `premiere scholie = primaire`;
+  - une action explicite `Normalize` detache les scholies en doublon comme scholies libres, sans mutation silencieuse au chargement;
+  - des tests couvrent le resume legacy et la normalisation de la marge gauche.
+
+**Pourquoi**
+
+- `SCH-03` verrouille l'invariant pour les nouvelles actions, mais des documents herites peuvent encore contenir plusieurs scholies liees au meme bloc.
+- La projection derivee sait deja identifier ces doublons, mais l'app ne les signale pas encore explicitement a l'utilisateur et ne les normalise pas durablement.
+
+**Objectif**
+
+- Rendre visibles les doublons herites et definir une strategie de normalisation claire sans rouvrir la creation de nouveaux doublons.
+
+**Travaux**
+
+1. Exposer un signal produit explicite quand une unite porte des `duplicateLeftMarginBlockIds`.
+2. Definir la strategie de normalisation:
+  - premiere scholie = primaire;
+  - doublons convertis en scholies libres, annexes ou suppressions assistees;
+  - ou correction a la sauvegarde / a la migration.
+3. La normalisation a lieu via une action explicite:
+  - la premiere scholie reste primaire;
+  - les doublons sont detaches comme scholies libres;
+  - aucune correction silencieuse n'est appliquee au chargement.
+4. Ajouter des fixtures et des tests couvrant les documents herites avec doublons.
+
+**Definition of done**
+
+- Un document legacy avec doublons suit une regle visible et documentee.
+- L'anomalie est signalee dans un etat produit explicite.
+- La strategie de normalisation est decidee et testee.
+
+**Dependances**
+
+- `SCH-03`
+- `SCH-02`
+- a coordonner avec `MODEL-02`
+
+---
+
 ### MAN-01 - Ajouter les operations de bloc cote manuscrit
+
+**Statut**
+
+- done le 2026-04-04
 
 **Pourquoi**
 
@@ -424,10 +498,10 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Ajouter les primitives cote manuscrit:
-   - inserer un bloc avant/apres;
-   - supprimer le bloc courant;
-   - dupliquer le bloc courant;
-   - deplacer le bloc courant vers le haut ou le bas.
+  - inserer un bloc avant/apres;
+  - supprimer le bloc courant;
+  - dupliquer le bloc courant;
+  - deplacer le bloc courant vers le haut ou le bas.
 2. Reutiliser `blockId` comme cle structurelle stable.
 3. Definir le comportement sur les listes top-level, titres, citations et paragraphes.
 4. Ajouter des commandes et raccourcis clavier seulement si l'UX reste lisible.
@@ -437,6 +511,8 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 - Le manuscrit peut etre construit bloc par bloc sans hacks de selection.
 - Les operations marchent sur les types de blocs deja supportes.
 - Les ids de blocs restent stables apres deplacement ou duplication.
+- Les operations de structure existent dans l'editeur manuscrit et dans la palette de commandes.
+- Les listes top-level suivent une regle stable: insertion, duplication et deplacement restent dans la liste courante; les autres blocs se reordonnent au niveau racine.
 
 **Dependances**
 
@@ -446,6 +522,18 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 ---
 
 ### PAIR-01 - Coordonner les actions au niveau unite
+
+**Statut**
+
+- done le 2026-04-04
+- fait:
+  - un coordinateur d'unites dedie orchestre maintenant les actions structurelles `bloc + scholie`;
+  - les commandes visibles du manuscrit et de la palette passent par cette couche unique;
+  - creation, suppression et deplacement d'un bloc emportent la scholie gauche associee;
+  - pour les documents legacy, suppression et deplacement emportent toutes les scholies liees; la duplication ne recopie que la scholie primaire;
+  - les unites sans scholie restent valides;
+  - le focus utilisateur est preserve entre manuscrit et marge selon le point d'entree;
+  - des tests couvrent creation, duplication, deplacement, suppression et garde-fous de resolution.
 
 **Pourquoi**
 
@@ -459,11 +547,11 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Ajouter dans `App.tsx` ou un module dedie des actions de haut niveau:
-   - `createUnitAfter`
-   - `deleteCurrentUnit`
-   - `duplicateCurrentUnit`
-   - `moveCurrentUnitUp`
-   - `moveCurrentUnitDown`
+  - `createUnitAfter`
+  - `deleteCurrentUnit`
+  - `duplicateCurrentUnit`
+  - `moveCurrentUnitUp`
+  - `moveCurrentUnitDown`
 2. Faire cooperer `ManuscriptEditorHandle` et `LeftMarginEditorHandle` pour ces actions.
 3. Preserver le focus utilisateur apres chaque action.
 4. Definir les regles pour les unites sans scholie et pour les documents herites.
@@ -483,6 +571,17 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### PAIR-02 - Introduire l'insertion explicite entre unites
 
+**Statut**
+
+- done le 2026-04-04
+- fait:
+  - le manuscrit expose maintenant des points `+` discrets avant, entre et apres les unites;
+  - le document vide propose un vrai point de depart `Start First Unit`;
+  - chaque insertion cree un bloc manuscrit vide et une scholie gauche associee;
+  - un raccourci rapide `Ctrl/Cmd+Alt+Enter` ajoute l'unite suivante ou demarre le document;
+  - la palette expose un chemin rapide `Unit: add passage`;
+  - des tests couvrent les insertions sans selection, en debut, en fin et sur document vide.
+
 **Pourquoi**
 
 - Ton modele demande un geste explicite de construction.
@@ -495,16 +594,16 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Introduire une affordance d'insertion entre blocs manuscrit:
-   - bouton `+` discret entre unites;
-   - ou commande contextuelle apparue au focus/hover.
+  - bouton `+` discret entre unites;
+  - ou commande contextuelle apparue au focus/hover.
 2. Faire que cette action cree:
-   - un bloc manuscrit vide;
-   - une scholie associee vide ou reduite.
+  - un bloc manuscrit vide;
+  - une scholie associee vide ou reduite.
 3. Verifier les etats:
-   - document vide;
-   - insertion en debut;
-   - insertion entre deux unites;
-   - insertion en fin.
+  - document vide;
+  - insertion en debut;
+  - insertion entre deux unites;
+  - insertion en fin.
 4. Maintenir un chemin clavier et palette pour les utilisateurs rapides.
 
 **Definition of done**
@@ -522,6 +621,16 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### PAIR-03 - Autoriser la scholie vide, reduite ou developpee
 
+**Statut**
+
+- done le 2026-04-04
+- fait:
+  - les scholies liees a gauche derivent maintenant un etat visuel `vide`, `reduite` ou `developpee` depuis le contenu et le focus courant;
+  - une scholie vide reste liee au bloc manuscrit sans imposer une saisie immediate;
+  - la scholie courante se developpe naturellement, tandis que les autres restent plus discretes;
+  - la marge signale explicitement `Empty scholie` quand la scholie courante est liee mais encore vide;
+  - des tests couvrent la derivation des etats et la distinction entre scholies de gauche et notes de droite.
+
 **Pourquoi**
 
 - Si chaque bloc impose une scholie pleine, l'ecriture devient trop lourde.
@@ -534,9 +643,9 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Definir trois etats simples:
-   - vide;
-   - reduite;
-   - developpee.
+  - vide;
+  - reduite;
+  - developpee.
 2. Choisir comment ces etats s'expriment visuellement sans chrome excessif.
 3. Conserver l'association au bloc meme quand la scholie est vide.
 4. Verifier que la suppression d'une scholie vide ne casse pas l'unite.
@@ -569,10 +678,10 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 1. Revoir `ThreePaneLayout` et les largeurs par defaut pour que le centre domine clairement.
 2. Sortir la marge gauche du look "cartes" actuel:
-   - moins de fonds pleins;
-   - moins de bordures lourdes;
-   - moins de badges;
-   - plus de typographie et de rythme vertical.
+  - moins de fonds pleins;
+  - moins de bordures lourdes;
+  - moins de badges;
+  - plus de typographie et de rythme vertical.
 3. Reduire la masse visuelle des toolbars et des chips autour de la marge.
 4. Verifier la coherence sur document vide, document long et `Untitled Draft`.
 
@@ -633,9 +742,9 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Choisir la forme canonique:
-   - table `document_units`;
-   - ou JSON structure unique;
-   - avec ordre, `unitId`, bloc principal et scholie associee.
+  - table `document_units`;
+  - ou JSON structure unique;
+  - avec ordre, `unitId`, bloc principal et scholie associee.
 2. Documenter le choix au regard de l'existant SQLite/Tauri.
 3. Definir comment le panneau droit s'articule avec ce modele.
 4. Introduire un repository ou service de lecture/ecriture dedie.
@@ -667,14 +776,14 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Ecrire la strategie de migration depuis:
-   - `manuscript_states`;
-   - `margin_left_states`;
-   - `margin_right_states`.
+  - `manuscript_states`;
+  - `margin_left_states`;
+  - `margin_right_states`.
 2. Definir la regle pour les cas ambigus:
-   - doublons de scholies;
-   - notes libres non liees;
-   - blocs manuscrit sans scholie;
-   - scholies sans bloc manuscrit valide.
+  - doublons de scholies;
+  - notes libres non liees;
+  - blocs manuscrit sans scholie;
+  - scholies sans bloc manuscrit valide.
 3. Ajouter un mode lecture/normalisation pour les anciens documents tant que la migration n'est pas finalisee.
 4. Tester la migration sur des fixtures representatifs.
 
@@ -705,12 +814,12 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Ajouter des tests sur:
-   - unicite de la scholie gauche par `blockId`;
-   - creation d'unite;
-   - suppression d'unite;
-   - duplication d'unite;
-   - deplacement d'unite;
-   - migration de documents anciens.
+  - unicite de la scholie gauche par `blockId`;
+  - creation d'unite;
+  - suppression d'unite;
+  - duplication d'unite;
+  - deplacement d'unite;
+  - migration de documents anciens.
 2. Ajouter au moins un scenario d'integration couvrant la coordination `App + manuscrit + marge gauche`.
 3. Etendre les fixtures de donnees pour les cas herites et ambigus.
 
@@ -742,10 +851,10 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 1. Definir comment une unite se traduit en PDF/print preview et en DOCX.
 2. Decider si la scholie est:
-   - inline;
-   - en note;
-   - en annexe;
-   - ou configurable selon le profil.
+  - inline;
+  - en note;
+  - en annexe;
+  - ou configurable selon le profil.
 3. Adapter les payloads d'export quand `MODEL-01` sera en place.
 4. Ajouter une matrice de sortie `unite -> export`.
 
@@ -949,9 +1058,9 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 **Travaux**
 
 1. Choisir une strategie:
-   - executeur capable de prendre un script SQL complet;
-   - format de migration plus simple;
-   - ou migrations codees si le plugin l'impose.
+  - executeur capable de prendre un script SQL complet;
+  - format de migration plus simple;
+  - ou migrations codees si le plugin l'impose.
 2. Documenter les contraintes de format.
 3. Ajouter un test sur au moins une migration representative.
 
@@ -979,14 +1088,14 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 1. Definir la pile de tests TypeScript.
 2. Ajouter des tests sur:
-   - `src/db/queries.ts`
-   - `src/db/db.ts`
-   - `src/editors/margin/marginaliaBlocks/indexing.ts`
-   - `src/utils/printPreview.ts`
+  - `src/db/queries.ts`
+  - `src/db/db.ts`
+  - `src/editors/margin/marginaliaBlocks/indexing.ts`
+  - `src/utils/printPreview.ts`
 3. Ajouter des tests Rust sur le parsing/export:
-   - `parse_manuscript_blocks`
-   - `parse_margin_blocks`
-   - regroupement comments/footnotes
+  - `parse_manuscript_blocks`
+  - `parse_margin_blocks`
+  - regroupement comments/footnotes
 4. Ajouter un script de CI local simple dans `package.json` et/ou documentation.
 
 **Definition of done**
@@ -1309,67 +1418,59 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ## Sprint recommande
 
-### Sprint 1
+### Sprint 7
 
-- `SEC-01`
-- `PERF-01`
-- `REL-01`
-
-**But**
-
-- Fermer les plus gros risques sans changer le scope produit.
-
-### Sprint 2
-
-- `DATA-01`
-- `SEC-02`
-- `QA-01`
-- `EXP-01`
+- `SAFE-01`
+- `LAY-01`
 
 **But**
 
-- Rendre le socle fiable et auditable.
+- Fiabiliser la manipulation structurelle et commencer a aerer l'interface maintenant que l'unite est plus legere.
 
-### Sprint 3
+### Sprint 8
 
-- `DATA-02`
-- `UX-01`
-- `DX-01`
-
-**But**
-
-- Ameliorer la qualite de vie du projet et preparer les evolutions.
-
-### Sprint 4+
-
-- `EXP-02`
-
-**But**
-
-- Monter en valeur produit sur l'export sans sacrifier la stabilite.
-
-### Sprint 5
-
-- `UX-02`
 - `UX-04`
 - `UX-06`
 
 **But**
 
-- Recentrer l'application sur l'ecriture et faire disparaitre le bruit de prototype.
+- Refaire respirer l'interface autour du manuscrit et des scholies maintenant que le socle unitaire existe.
 
-### Sprint 6
+### Sprint 9
 
+- `MODEL-01`
+- `QA-02`
+- `EXP-03`
+
+**But**
+
+- Stabiliser la persistance canonique et l'alignement export une fois l'UX d'unites validee.
+
+### Sprint 10+
+
+- `MODEL-02`
+- `EXP-02`
+- `UX-02`
 - `UX-03`
 - `UX-05`
 
 **But**
 
-- Donner a Marginalia une vraie presence d'app d'ecriture, coherente avec sa promesse editoriale.
+- Basculer du socle durci vers une experience editoriale pleinement assumee.
 
 ---
 
 ## Tickets prets a ouvrir
+
+**Priorite actuelle**
+
+- `SAFE-01`: reorder fiable sans drag souris
+- `LAY-01`: reequilibrer la grille en faveur du manuscrit
+- `MODEL-01`: introduire un modele canonique par unites
+
+**Note**
+
+- La liste detaillee ci-dessous est historique et n'est plus l'ordre d'ouverture recommande depuis la cloture de `SCH-03`, `SCH-04`, `MAN-01`, `PAIR-01` et `PAIR-02`.
 
 ### Ticket 1
 
@@ -1379,11 +1480,11 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Sanitizer HTML defini
-- [ ] Injection `srcDoc` securisee
-- [ ] CSP Tauri active
-- [ ] Test de contenu hostile
-- [ ] Verification manuelle impression Windows
+- Sanitizer HTML defini
+- Injection `srcDoc` securisee
+- CSP Tauri active
+- Test de contenu hostile
+- Verification manuelle impression Windows
 
 ### Ticket 2
 
@@ -1393,9 +1494,9 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] `paneSizes` persiste seulement en fin d'interaction ou debounce
-- [ ] Pas de lag perceptible au resize
-- [ ] Restore OK au redemarrage
+- `paneSizes` persiste seulement en fin d'interaction ou debounce
+- Pas de lag perceptible au resize
+- Restore OK au redemarrage
 
 ### Ticket 3
 
@@ -1405,9 +1506,9 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Ecran/etat d'erreur demarrage
-- [ ] Feedback erreur export
-- [ ] Logs minimum
+- Ecran/etat d'erreur demarrage
+- Feedback erreur export
+- Logs minimum
 
 ### Ticket 4
 
@@ -1417,8 +1518,8 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Creation atomique
-- [ ] Test de non-regression
+- Creation atomique
+- Test de non-regression
 
 ### Ticket 5
 
@@ -1428,9 +1529,9 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Inventaire usages plugins
-- [ ] Permissions inutiles retirees
-- [ ] Smoke test fonctionnel
+- Inventaire usages plugins
+- Permissions inutiles retirees
+- Smoke test fonctionnel
 
 ### Ticket 6
 
@@ -1440,10 +1541,10 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Strategie test TS choisie
-- [ ] Tests DB minimum
-- [ ] Tests export Rust minimum
-- [ ] Commande documentee
+- Strategie test TS choisie
+- Tests DB minimum
+- Tests export Rust minimum
+- Commande documentee
 
 ### Ticket 7
 
@@ -1453,11 +1554,11 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Colonne de manuscrit plus editoriale
-- [ ] Hierarchie visuelle recentree sur le texte
-- [ ] Gestes de construction par unite clarifies
-- [ ] Toolbars declasses visuellement
-- [ ] Validation ecran vide / ecran rempli
+- Colonne de manuscrit plus editoriale
+- Hierarchie visuelle recentree sur le texte
+- Gestes de construction par unite clarifies
+- Toolbars declasses visuellement
+- Validation ecran vide / ecran rempli
 
 ### Ticket 8
 
@@ -1467,11 +1568,11 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Vocabulaire de scholies coherent
-- [ ] Actions moins dominantes
-- [ ] Scholies plus lisibles que la chrome
-- [ ] Etats de liaison mieux mis en scene
-- [ ] Actions secondaires deplacees hors de la vue primaire
+- Vocabulaire de scholies coherent
+- Actions moins dominantes
+- Scholies plus lisibles que la chrome
+- Etats de liaison mieux mis en scene
+- Actions secondaires deplacees hors de la vue primaire
 
 ### Ticket 9
 
@@ -1481,10 +1582,10 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Raccourcis permanents audites
-- [ ] Statuts simplifies
-- [ ] Aide contextuelle ou repliable
-- [ ] Verification de la decouvrabilite
+- Raccourcis permanents audites
+- Statuts simplifies
+- Aide contextuelle ou repliable
+- Verification de la decouvrabilite
 
 ### Ticket 10
 
@@ -1494,10 +1595,10 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Checklist**
 
-- [ ] Axe visuel choisi
-- [ ] Tokens et surfaces revisites
-- [ ] Hierarchie typo renforcee
-- [ ] Captures avant/apres
+- Axe visuel choisi
+- Tokens et surfaces revisites
+- Hierarchie typo renforcee
+- Captures avant/apres
 
 ---
 

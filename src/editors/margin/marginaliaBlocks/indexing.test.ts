@@ -60,3 +60,32 @@ test("buildMarginLinkIndexFromLexicalJson groups multiple notes by manuscript bl
     "m-2": ["right-1"],
   });
 });
+
+test("buildMarginLinkIndexFromLexicalJson can keep only the first linked scholie per manuscript block", () => {
+  const lexicalJson = JSON.stringify({
+    root: {
+      children: [
+        {
+          type: "marginalia-block",
+          marginBlockId: "left-1",
+          linkedManuscriptBlockId: "m-1",
+        },
+        {
+          type: "marginalia-block",
+          marginBlockId: "left-2",
+          linkedManuscriptBlockId: "m-1",
+        },
+        {
+          type: "marginalia-block",
+          marginBlockId: "left-3",
+          linkedManuscriptBlockId: "m-2",
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(buildMarginLinkIndexFromLexicalJson(lexicalJson, { uniquePerManuscriptBlock: true }), {
+    "m-1": ["left-1"],
+    "m-2": ["left-3"],
+  });
+});

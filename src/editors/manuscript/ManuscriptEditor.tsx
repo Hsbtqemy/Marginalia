@@ -45,11 +45,18 @@ import { debounce } from "../../utils/debounce";
 import { useAppStore } from "../../state/useAppStore";
 import { BlockIdPlugin } from "./lexicalBlocks/BlockIdPlugin";
 import {
+  collectManuscriptBlockIds,
+  deleteCurrentManuscriptBlock,
+  duplicateCurrentManuscriptBlock,
   findManuscriptBlockNodeById,
   getCurrentSelectionBlockId,
   getSelectionBlockNode,
   ensureCurrentSelectionBlockId as ensureCurrentSelectionBlockIdInEditor,
+  insertManuscriptBlockAfterCurrent,
+  insertManuscriptBlockBeforeCurrent,
   insertLinkedPassageAfterSelection,
+  moveCurrentManuscriptBlockDown,
+  moveCurrentManuscriptBlockUp,
 } from "./lexicalBlocks/manuscriptBlockUtils";
 
 const MANUSCRIPT_THEME = {
@@ -72,8 +79,15 @@ export interface ManuscriptEditorHandle {
   focusEditor: () => void;
   getHtml: () => string;
   getLexicalJson: () => string;
+  listBlockIds: () => string[];
   ensureCurrentSelectionBlockId: () => string | null;
   createLinkedPassageBlock: () => string | null;
+  insertBlockBefore: (blockId?: string | null) => string | null;
+  insertBlockAfter: (blockId?: string | null) => string | null;
+  duplicateBlock: (blockId?: string | null) => string | null;
+  moveBlockUp: (blockId?: string | null) => string | null;
+  moveBlockDown: (blockId?: string | null) => string | null;
+  deleteBlock: (blockId?: string | null) => string | null;
 }
 
 interface ManuscriptEditorProps {
@@ -83,6 +97,16 @@ interface ManuscriptEditorProps {
   onCurrentBlockIdChange: (blockId: string | null) => void;
   onCreateLinkedMarginalia: (manuscriptBlockId: string | null) => void;
   onRevealMarginalia: (manuscriptBlockId: string | null) => void;
+  onInsertUnitBefore: () => void;
+  onInsertUnitAfter: () => void;
+  onInsertUnitBeforeBlock: (blockId: string) => void;
+  onInsertUnitAfterBlock: (blockId: string) => void;
+  onInsertUnitAtStart: () => void;
+  onQuickInsertUnit: () => void;
+  onDuplicateUnit: () => void;
+  onMoveUnitUp: () => void;
+  onMoveUnitDown: () => void;
+  onDeleteUnit: () => void;
   onFocusChange?: (focused: boolean) => void;
 }
 
@@ -169,6 +193,7 @@ function EditorBridgePlugin(props: {
   editorRef: MutableRefObject<LexicalEditor | null>;
   onCreateLinkedMarginalia: (manuscriptBlockId: string | null) => void;
   onRevealMarginalia: (manuscriptBlockId: string | null) => void;
+  onQuickInsertUnit: () => void;
   onToolbarStateChange: (state: ManuscriptToolbarState) => void;
   onBlurSave: () => void;
   onFocusChange?: (focused: boolean) => void;
@@ -177,6 +202,7 @@ function EditorBridgePlugin(props: {
   const callbacksRef = useRef({
     onCreateLinkedMarginalia: props.onCreateLinkedMarginalia,
     onRevealMarginalia: props.onRevealMarginalia,
+    onQuickInsertUnit: props.onQuickInsertUnit,
     onToolbarStateChange: props.onToolbarStateChange,
     onBlurSave: props.onBlurSave,
     onFocusChange: props.onFocusChange,
@@ -186,6 +212,7 @@ function EditorBridgePlugin(props: {
     callbacksRef.current = {
       onCreateLinkedMarginalia: props.onCreateLinkedMarginalia,
       onRevealMarginalia: props.onRevealMarginalia,
+      onQuickInsertUnit: props.onQuickInsertUnit,
       onToolbarStateChange: props.onToolbarStateChange,
       onBlurSave: props.onBlurSave,
       onFocusChange: props.onFocusChange,
@@ -193,6 +220,7 @@ function EditorBridgePlugin(props: {
   }, [
     props.onCreateLinkedMarginalia,
     props.onRevealMarginalia,
+    props.onQuickInsertUnit,
     props.onToolbarStateChange,
     props.onBlurSave,
     props.onFocusChange,
@@ -236,6 +264,11 @@ function EditorBridgePlugin(props: {
             editor.getEditorState().read(() => {
               callbacksRef.current.onRevealMarginalia(getCurrentSelectionBlockId());
             });
+            return true;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            callbacksRef.current.onQuickInsertUnit();
             return true;
           }
           if (event.key === "1" || event.key === "2" || event.key === "3") {
@@ -292,11 +325,203 @@ function EditorBridgePlugin(props: {
   return null;
 }
 
+interface UnitInsertionPoint {
+  key: string;
+  top: number;
+  anchorBlockId: string;
+  position: "before" | "after";
+  label: string;
+}
+
+function UnitInsertionOverlayPlugin(props: {
+  hostRef: MutableRefObject<HTMLDivElement | null>;
+  onInsertUnitBeforeBlock: (blockId: string) => void;
+  onInsertUnitAfterBlock: (blockId: string) => void;
+  onInsertUnitAtStart: () => void;
+}) {
+  const [editor] = useLexicalComposerContext();
+  const [insertionPoints, setInsertionPoints] = useState<UnitInsertionPoint[]>([]);
+  const [isEmptyDocument, setIsEmptyDocument] = useState(false);
+
+  useEffect(() => {
+    let frameHandle = 0;
+    let resizeObserver: ResizeObserver | null =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            scheduleMeasurement();
+          });
+
+    const measureInsertionPoints = () => {
+      const root = editor.getRootElement();
+      const host = props.hostRef.current;
+      if (!root || !host) {
+        setInsertionPoints([]);
+        setIsEmptyDocument(false);
+        return;
+      }
+
+      const blockElements = Array.from(
+        root.querySelectorAll<HTMLElement>("[data-manuscript-block-id]"),
+      ).filter((element) => (element.dataset.manuscriptBlockId ?? "").length > 0);
+
+      if (blockElements.length === 0) {
+        setInsertionPoints([]);
+        setIsEmptyDocument(true);
+        return;
+      }
+
+      const hostRect = host.getBoundingClientRect();
+      const nextInsertionPoints: UnitInsertionPoint[] = [];
+
+      for (let index = 0; index < blockElements.length; index += 1) {
+        const blockElement = blockElements[index];
+        const blockId = blockElement.dataset.manuscriptBlockId ?? "";
+        const blockRect = blockElement.getBoundingClientRect();
+
+        if (index === 0) {
+          nextInsertionPoints.push({
+            key: `before-${blockId}`,
+            top: Math.max(blockRect.top - hostRect.top - 18, 18),
+            anchorBlockId: blockId,
+            position: "before",
+            label: "Insert a unit before this passage",
+          });
+        }
+
+        if (index < blockElements.length - 1) {
+          const nextBlockRect = blockElements[index + 1].getBoundingClientRect();
+          nextInsertionPoints.push({
+            key: `after-${blockId}`,
+            top: ((blockRect.bottom + nextBlockRect.top) / 2) - hostRect.top,
+            anchorBlockId: blockId,
+            position: "after",
+            label: "Insert a unit between these passages",
+          });
+        } else {
+          nextInsertionPoints.push({
+            key: `after-${blockId}-end`,
+            top: blockRect.bottom - hostRect.top + 18,
+            anchorBlockId: blockId,
+            position: "after",
+            label: "Insert a unit after this passage",
+          });
+        }
+      }
+
+      setInsertionPoints(nextInsertionPoints);
+      setIsEmptyDocument(false);
+    };
+
+    const scheduleMeasurement = () => {
+      window.cancelAnimationFrame(frameHandle);
+      frameHandle = window.requestAnimationFrame(measureInsertionPoints);
+    };
+
+    const observeInsertionLayout = (rootElement: HTMLElement | null) => {
+      if (!resizeObserver) {
+        return;
+      }
+
+      resizeObserver.disconnect();
+
+      const host = props.hostRef.current;
+      if (host) {
+        resizeObserver.observe(host);
+      }
+      if (rootElement) {
+        resizeObserver.observe(rootElement);
+      }
+    };
+
+    scheduleMeasurement();
+    observeInsertionLayout(editor.getRootElement());
+
+    const unregister = mergeRegister(
+      editor.registerUpdateListener(() => {
+        scheduleMeasurement();
+      }),
+      editor.registerRootListener((rootElement) => {
+        observeInsertionLayout(rootElement);
+        scheduleMeasurement();
+      }),
+    );
+
+    window.addEventListener("resize", scheduleMeasurement);
+
+    return () => {
+      window.cancelAnimationFrame(frameHandle);
+      unregister();
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      window.removeEventListener("resize", scheduleMeasurement);
+    };
+  }, [editor, props.hostRef]);
+
+  return (
+    <>
+      {isEmptyDocument ? (
+        <div className="manuscript-empty-unit-cta">
+          <span className="manuscript-empty-unit-kicker">Write by units</span>
+          <strong className="manuscript-empty-unit-title">Start with a passage and its scholie.</strong>
+          <p className="manuscript-empty-unit-copy">
+            Create the first unit here, then keep adding passages between existing units as the draft grows.
+          </p>
+          <button
+            className="toolbar-button toolbar-button-prominent manuscript-empty-unit-button"
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={props.onInsertUnitAtStart}
+          >
+            Start First Unit
+          </button>
+          <span className="manuscript-empty-unit-shortcut">Shortcut: Ctrl/Cmd+Alt+Enter</span>
+        </div>
+      ) : null}
+      {insertionPoints.length > 0 ? (
+        <div className="manuscript-unit-insertion-overlay">
+          {insertionPoints.map((insertionPoint) => (
+            <div
+              key={insertionPoint.key}
+              className="manuscript-unit-insertion-slot"
+              style={{ top: `${insertionPoint.top}px` }}
+            >
+              <button
+                className="manuscript-unit-insertion-button"
+                type="button"
+                aria-label={insertionPoint.label}
+                title={insertionPoint.label}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (insertionPoint.position === "before") {
+                    props.onInsertUnitBeforeBlock(insertionPoint.anchorBlockId);
+                    return;
+                  }
+
+                  props.onInsertUnitAfterBlock(insertionPoint.anchorBlockId);
+                }}
+              >
+                +
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function ManuscriptToolbar(props: {
   editorRef: MutableRefObject<LexicalEditor | null>;
   toolbarState: ManuscriptToolbarState;
   onRevealMarginalia: (manuscriptBlockId: string | null) => void;
   onCreateLinkedMarginalia: (manuscriptBlockId: string | null) => void;
+  onInsertUnitBefore: () => void;
+  onInsertUnitAfter: () => void;
+  onDuplicateUnit: () => void;
+  onMoveUnitUp: () => void;
+  onMoveUnitDown: () => void;
+  onDeleteUnit: () => void;
 }) {
   const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
   const leftLinksByManuscriptBlockId = useAppStore((state) => state.leftLinksByManuscriptBlockId);
@@ -316,6 +541,7 @@ function ManuscriptToolbar(props: {
 
   const linkedLeftCount = currentManuscriptBlockId ? (leftLinksByManuscriptBlockId[currentManuscriptBlockId]?.length ?? 0) : 0;
   const linkedRightCount = currentManuscriptBlockId ? (rightLinksByManuscriptBlockId[currentManuscriptBlockId]?.length ?? 0) : 0;
+  const manuscriptBlockActionsDisabled = !currentManuscriptBlockId;
 
   return (
     <>
@@ -338,6 +564,61 @@ function ManuscriptToolbar(props: {
             Reveal Scholies
           </button>
         </div>
+        <div className="toolbar-inline-group">
+          <button
+            className="toolbar-button toolbar-button-compact"
+            type="button"
+            disabled={manuscriptBlockActionsDisabled}
+            onClick={props.onInsertUnitBefore}
+          >
+            Insert Before
+          </button>
+          <button
+            className="toolbar-button toolbar-button-compact"
+            type="button"
+            disabled={manuscriptBlockActionsDisabled}
+            onClick={props.onInsertUnitAfter}
+          >
+            Insert After
+          </button>
+        </div>
+        <details className="editor-advanced-tools">
+          <summary>Structure</summary>
+          <div className="editor-advanced-tools-body">
+            <button
+              className="toolbar-button"
+              type="button"
+              disabled={manuscriptBlockActionsDisabled}
+              onClick={props.onDuplicateUnit}
+            >
+              Duplicate
+            </button>
+            <button
+              className="toolbar-button"
+              type="button"
+              disabled={manuscriptBlockActionsDisabled}
+              onClick={props.onMoveUnitUp}
+            >
+              Move Up
+            </button>
+            <button
+              className="toolbar-button"
+              type="button"
+              disabled={manuscriptBlockActionsDisabled}
+              onClick={props.onMoveUnitDown}
+            >
+              Move Down
+            </button>
+            <button
+              className="toolbar-button"
+              type="button"
+              disabled={manuscriptBlockActionsDisabled}
+              onClick={props.onDeleteUnit}
+            >
+              Delete
+            </button>
+          </div>
+        </details>
         <details className="editor-advanced-tools">
           <summary>Format</summary>
           <div className="editor-advanced-tools-body">
@@ -431,8 +712,10 @@ function ManuscriptToolbar(props: {
           <div className="context-help-body">
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N add scholie for passage</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G reveal scholies</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Enter add the next unit</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+1/2/3 apply heading</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+0 return to paragraph</span>
+            <span className="margin-shortcut-hint">Structure tools insert, duplicate, move, and delete passages</span>
           </div>
         </details>
       </div>
@@ -443,6 +726,7 @@ function ManuscriptToolbar(props: {
 export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEditorProps>(
   function ManuscriptEditorComponent(props, ref) {
     const editorRef = useRef<LexicalEditor | null>(null);
+    const contentWrapRef = useRef<HTMLDivElement | null>(null);
     const [toolbarState, setToolbarState] = useState<ManuscriptToolbarState>(DEFAULT_MANUSCRIPT_TOOLBAR_STATE);
     const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
     const leftLinksByManuscriptBlockId = useAppStore((state) => state.leftLinksByManuscriptBlockId);
@@ -462,7 +746,22 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
       autosave.cancel();
       props.onAutosave(json);
     }, [autosave, props.onAutosave]);
+    const runStructuralOperation = useCallback(
+      (operation: (blockId?: string | null) => string | null, blockId?: string | null): string | null => {
+        const editor = editorRef.current;
+        if (!editor) {
+          return null;
+        }
 
+        let result: string | null = null;
+        editor.update(() => {
+          result = operation(blockId);
+        });
+        editor.focus();
+        return result;
+      },
+      [],
+    );
     useEffect(() => {
       return () => {
         autosave.flush();
@@ -506,6 +805,7 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
           const root = editor.getRootElement();
           const target = root?.querySelector<HTMLElement>(`[data-manuscript-block-id="${blockId}"]`);
           target?.scrollIntoView({ behavior: "smooth", block: "center" });
+          editor.focus();
         },
         focusEditor: () => {
           editorRef.current?.focus();
@@ -528,6 +828,18 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
             return props.initialStateJson;
           }
           return JSON.stringify(editor.getEditorState().toJSON());
+        },
+        listBlockIds: () => {
+          const editor = editorRef.current;
+          if (!editor) {
+            return [];
+          }
+
+          let blockIds: string[] = [];
+          editor.getEditorState().read(() => {
+            blockIds = collectManuscriptBlockIds();
+          });
+          return blockIds;
         },
         ensureCurrentSelectionBlockId: () => {
           const editor = editorRef.current;
@@ -553,8 +865,14 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
           });
           return createdBlockId;
         },
+        insertBlockBefore: (blockId) => runStructuralOperation(insertManuscriptBlockBeforeCurrent, blockId),
+        insertBlockAfter: (blockId) => runStructuralOperation(insertManuscriptBlockAfterCurrent, blockId),
+        duplicateBlock: (blockId) => runStructuralOperation(duplicateCurrentManuscriptBlock, blockId),
+        moveBlockUp: (blockId) => runStructuralOperation(moveCurrentManuscriptBlockUp, blockId),
+        moveBlockDown: (blockId) => runStructuralOperation(moveCurrentManuscriptBlockDown, blockId),
+        deleteBlock: (blockId) => runStructuralOperation(deleteCurrentManuscriptBlock, blockId),
       }),
-      [props.initialStateJson],
+      [props.initialStateJson, runStructuralOperation],
     );
 
     const initialConfig = useMemo(
@@ -577,21 +895,33 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
           toolbarState={toolbarState}
           onCreateLinkedMarginalia={props.onCreateLinkedMarginalia}
           onRevealMarginalia={props.onRevealMarginalia}
+          onInsertUnitBefore={props.onInsertUnitBefore}
+          onInsertUnitAfter={props.onInsertUnitAfter}
+          onDuplicateUnit={props.onDuplicateUnit}
+          onMoveUnitUp={props.onMoveUnitUp}
+          onMoveUnitDown={props.onMoveUnitDown}
+          onDeleteUnit={props.onDeleteUnit}
         />
         <LexicalComposer initialConfig={initialConfig}>
           <div className={`lexical-scroll manuscript-scroll ${props.pagePreview ? "page-preview" : ""}`}>
-            <div className="editor-content-wrap manuscript-page">
+            <div ref={contentWrapRef} className="editor-content-wrap manuscript-page">
               <RichTextPlugin
                 contentEditable={<ContentEditable className="lexical-editor" aria-label="Manuscript editor" />}
                 placeholder={
                   <div className="lexical-placeholder manuscript-placeholder">
                     <span className="manuscript-placeholder-title">Begin the manuscript.</span>
                     <span className="manuscript-placeholder-copy">
-                      Draft a passage here, then attach a scholie when a block needs commentary.
+                      Create the first unit here, then keep adding passages between units as the manuscript grows.
                     </span>
                   </div>
                 }
                 ErrorBoundary={LexicalErrorBoundary}
+              />
+              <UnitInsertionOverlayPlugin
+                hostRef={contentWrapRef}
+                onInsertUnitBeforeBlock={props.onInsertUnitBeforeBlock}
+                onInsertUnitAfterBlock={props.onInsertUnitAfterBlock}
+                onInsertUnitAtStart={props.onInsertUnitAtStart}
               />
             </div>
           </div>
@@ -608,6 +938,7 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
             editorRef={editorRef}
             onCreateLinkedMarginalia={props.onCreateLinkedMarginalia}
             onRevealMarginalia={props.onRevealMarginalia}
+            onQuickInsertUnit={props.onQuickInsertUnit}
             onToolbarStateChange={handleToolbarStateChange}
             onFocusChange={props.onFocusChange}
             onBlurSave={handleBlurSave}

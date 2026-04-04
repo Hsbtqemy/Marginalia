@@ -34,6 +34,8 @@ test("linked marginalia scheduler keeps only the latest pending request", () => 
     getCurrentDocumentId: () => "doc-1",
     resolveManuscriptBlockForLink: (manuscriptBlockId) => manuscriptBlockId,
     focusManuscriptBlockById: (manuscriptBlockId) => actions.push(`focus:${manuscriptBlockId}`),
+    findLinkedMarginBlockIdByManuscriptBlockId: () => null,
+    focusMarginBlockById: (marginBlockId) => actions.push(`focus-margin-block:${marginBlockId}`),
     insertLinkedMarginBlock: (manuscriptBlockId) => actions.push(`insert:${manuscriptBlockId}`),
     focusMarginEditor: () => actions.push("focus-margin"),
     reportError: () => {
@@ -51,6 +53,31 @@ test("linked marginalia scheduler keeps only the latest pending request", () => 
   assert.deepEqual(actions, ["focus:second", "insert:second", "focus-margin"]);
 });
 
+test("linked marginalia scheduler reuses the first linked scholie when one already exists", () => {
+  const timers = new FakeTimers();
+  const actions: string[] = [];
+
+  const scheduler = createLinkedMarginaliaScheduler({
+    timers,
+    getCurrentDocumentId: () => "doc-1",
+    resolveManuscriptBlockForLink: (manuscriptBlockId) => manuscriptBlockId ?? "ensured-block",
+    focusManuscriptBlockById: (manuscriptBlockId) => actions.push(`focus:${manuscriptBlockId}`),
+    findLinkedMarginBlockIdByManuscriptBlockId: (manuscriptBlockId) =>
+      manuscriptBlockId === "ensured-block" ? "left-1" : null,
+    focusMarginBlockById: (marginBlockId) => actions.push(`focus-margin-block:${marginBlockId}`),
+    insertLinkedMarginBlock: (manuscriptBlockId) => actions.push(`insert:${manuscriptBlockId}`),
+    focusMarginEditor: () => actions.push("focus-margin"),
+    reportError: () => {
+      throw new Error("Unexpected error report");
+    },
+  });
+
+  scheduler.schedule("doc-1", null);
+  timers.flushAll();
+
+  assert.deepEqual(actions, ["focus:ensured-block", "focus-margin-block:left-1", "focus-margin"]);
+});
+
 test("linked marginalia scheduler drops work when the active document changes before flush", () => {
   const timers = new FakeTimers();
   const actions: string[] = [];
@@ -61,6 +88,8 @@ test("linked marginalia scheduler drops work when the active document changes be
     getCurrentDocumentId: () => currentDocumentId,
     resolveManuscriptBlockForLink: (manuscriptBlockId) => manuscriptBlockId ?? "ensured-block",
     focusManuscriptBlockById: (manuscriptBlockId) => actions.push(`focus:${manuscriptBlockId}`),
+    findLinkedMarginBlockIdByManuscriptBlockId: () => null,
+    focusMarginBlockById: (marginBlockId) => actions.push(`focus-margin-block:${marginBlockId}`),
     insertLinkedMarginBlock: (manuscriptBlockId) => actions.push(`insert:${manuscriptBlockId}`),
     focusMarginEditor: () => actions.push("focus-margin"),
     reportError: () => {
@@ -86,6 +115,8 @@ test("linked marginalia scheduler reports editor failures without throwing", () 
     getCurrentDocumentId: () => "doc-1",
     resolveManuscriptBlockForLink: (manuscriptBlockId) => manuscriptBlockId ?? "ensured-block",
     focusManuscriptBlockById: () => undefined,
+    findLinkedMarginBlockIdByManuscriptBlockId: () => null,
+    focusMarginBlockById: () => undefined,
     insertLinkedMarginBlock: () => {
       throw failure;
     },
