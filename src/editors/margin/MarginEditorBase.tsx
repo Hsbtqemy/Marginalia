@@ -120,6 +120,26 @@ interface MarginToolbarState {
   linkedManuscriptBlockId: string | null;
 }
 
+interface MarginUiCopy {
+  toolbarLabel: string;
+  allowStandaloneCreate: boolean;
+  createStandaloneLabel: string;
+  createLinkedLabel: string;
+  linkActionLabel: string;
+  unlinkActionLabel: string;
+  duplicateActionLabel: string;
+  deleteActionLabel: string;
+  linkedStatusLabel: string;
+  unlinkedStatusLabel: string;
+  createShortcutHint: string;
+  linkShortcutHint: string;
+  duplicateShortcutHint: string;
+  splitShortcutHint: string;
+  deleteShortcutHint: string;
+  placeholder: string;
+  addButtonAriaLabel: string;
+}
+
 type DropPosition = "before" | "after";
 
 interface DragCandidate {
@@ -154,6 +174,50 @@ const DEFAULT_MARGIN_TOOLBAR_STATE: MarginToolbarState = {
   blockType: "paragraph",
   linkedManuscriptBlockId: null,
 };
+
+function getMarginUiCopy(kind: MarginKind): MarginUiCopy {
+  if (kind === "left") {
+    return {
+      toolbarLabel: "Scholies",
+      allowStandaloneCreate: false,
+      createStandaloneLabel: "New Scholie",
+      createLinkedLabel: "Add Scholie",
+      linkActionLabel: "Attach to Passage",
+      unlinkActionLabel: "Detach Scholie",
+      duplicateActionLabel: "Duplicate Scholie",
+      deleteActionLabel: "Delete Scholie",
+      linkedStatusLabel: "Attached scholie",
+      unlinkedStatusLabel: "Awaiting passage",
+      createShortcutHint: "Ctrl/Cmd+Alt+N add scholie for current passage",
+      linkShortcutHint: "Ctrl/Cmd+Alt+L attach current scholie",
+      duplicateShortcutHint: "Ctrl/Cmd+Alt+D duplicate scholie",
+      splitShortcutHint: "Ctrl/Cmd+Alt+S split scholie",
+      deleteShortcutHint: "Ctrl/Cmd+Alt+X delete scholie",
+      placeholder: "Select a passage, then add a scholie.",
+      addButtonAriaLabel: "Add scholie",
+    };
+  }
+
+  return {
+    toolbarLabel: "Sources",
+    allowStandaloneCreate: true,
+    createStandaloneLabel: "New Source Note",
+    createLinkedLabel: "Source for Passage",
+    linkActionLabel: "Attach to Passage",
+    unlinkActionLabel: "Detach from Passage",
+    duplicateActionLabel: "Duplicate Source Note",
+    deleteActionLabel: "Delete Source Note",
+    linkedStatusLabel: "Attached source",
+    unlinkedStatusLabel: "Source note",
+    createShortcutHint: "Ctrl/Cmd+Alt+N add source note for passage",
+    linkShortcutHint: "Ctrl/Cmd+Alt+L attach current source note",
+    duplicateShortcutHint: "Ctrl/Cmd+Alt+D duplicate source note",
+    splitShortcutHint: "Ctrl/Cmd+Alt+S split source note",
+    deleteShortcutHint: "Ctrl/Cmd+Alt+X delete source note",
+    placeholder: "Capture sources, citations, or annexes...",
+    addButtonAriaLabel: "Add source note",
+  };
+}
 
 function marginToolbarStateEquals(a: MarginToolbarState, b: MarginToolbarState): boolean {
   return (
@@ -861,6 +925,8 @@ function MarginToolbar(props: {
   canInsertLinkedBlock: boolean;
   onGoToLinkedManuscript: () => void;
 }) {
+  const copy = getMarginUiCopy(props.kind);
+
   const run = (callback: (editor: LexicalEditor) => void) => {
     const editor = props.editorRef.current;
     if (!editor) {
@@ -895,29 +961,31 @@ function MarginToolbar(props: {
   return (
     <>
       <div className="editor-toolbar editor-toolbar-margin">
-        <span className="editor-toolbar-label">Notes</span>
+        <span className="editor-toolbar-label">{copy.toolbarLabel}</span>
         <div className="toolbar-inline-group">
-          <button
-            className="toolbar-button toolbar-button-prominent"
-            type="button"
-            onClick={() =>
-              run((editor) =>
-                editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
-                  kind: props.kind,
-                  linkedManuscriptBlockId: null,
-                }),
-              )
-            }
-          >
-            New Note
-          </button>
+          {copy.allowStandaloneCreate ? (
+            <button
+              className="toolbar-button toolbar-button-prominent"
+              type="button"
+              onClick={() =>
+                run((editor) =>
+                  editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
+                    kind: props.kind,
+                    linkedManuscriptBlockId: null,
+                  }),
+                )
+              }
+            >
+              {copy.createStandaloneLabel}
+            </button>
+          ) : null}
           <button
             className="toolbar-button toolbar-button-prominent"
             type="button"
             onClick={props.onInsertLinkedBlock}
             disabled={!props.canInsertLinkedBlock}
           >
-            New Linked Pair
+            {copy.createLinkedLabel}
           </button>
         </div>
         <div className="toolbar-inline-group">
@@ -1037,7 +1105,7 @@ function MarginToolbar(props: {
               }
               disabled={!props.currentManuscriptBlockId}
             >
-              Link to Passage
+              {copy.linkActionLabel}
             </button>
             <button className="toolbar-button toolbar-button-compact" type="button" onClick={props.onGoToLinkedManuscript}>
               Go to Passage
@@ -1047,7 +1115,7 @@ function MarginToolbar(props: {
               type="button"
               onClick={() => run((editor) => editor.dispatchCommand(UNLINK_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}
             >
-              Remove Link
+              {copy.unlinkActionLabel}
             </button>
             <button
               className="toolbar-button"
@@ -1075,7 +1143,7 @@ function MarginToolbar(props: {
               type="button"
               onClick={() => run((editor) => editor.dispatchCommand(DUPLICATE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}
             >
-              Duplicate Note
+              {copy.duplicateActionLabel}
             </button>
             <button
               className="toolbar-button"
@@ -1096,7 +1164,7 @@ function MarginToolbar(props: {
               type="button"
               onClick={() => run((editor) => editor.dispatchCommand(DELETE_CURRENT_MARGINALIA_BLOCK_COMMAND, undefined))}
             >
-              Delete Note
+              {copy.deleteActionLabel}
             </button>
           </div>
         </details>
@@ -1108,7 +1176,7 @@ function MarginToolbar(props: {
               props.toolbarState.linkedManuscriptBlockId ? "is-linked" : "is-unlinked"
             }`}
           >
-            {props.toolbarState.linkedManuscriptBlockId ? "Linked note" : "Free note"}
+            {props.toolbarState.linkedManuscriptBlockId ? copy.linkedStatusLabel : copy.unlinkedStatusLabel}
           </span>
           {props.currentManuscriptBlockId ? (
             <span className="margin-status-chip is-targeting">Passage ready</span>
@@ -1117,14 +1185,14 @@ function MarginToolbar(props: {
         <details className="context-help">
           <summary>Help</summary>
           <div className="context-help-body">
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked pair</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+L link current note</span>
+            <span className="margin-shortcut-hint">{copy.createShortcutHint}</span>
+            <span className="margin-shortcut-hint">{copy.linkShortcutHint}</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G jump to passage</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+D duplicate note</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+S split note</span>
+            <span className="margin-shortcut-hint">{copy.duplicateShortcutHint}</span>
+            <span className="margin-shortcut-hint">{copy.splitShortcutHint}</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Shift+Up merge upward</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Shift+Down merge downward</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+X delete note</span>
+            <span className="margin-shortcut-hint">{copy.deleteShortcutHint}</span>
           </div>
         </details>
       </div>
@@ -1140,6 +1208,7 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
   const revealTimeoutRef = useRef<number | null>(null);
   const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
   const [toolbarState, setToolbarState] = useState<MarginToolbarState>(DEFAULT_MARGIN_TOOLBAR_STATE);
+  const copy = useMemo(() => getMarginUiCopy(props.kind), [props.kind]);
 
   const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props.onAutosave]);
   const linkIndexSave = useMemo(
@@ -1332,7 +1401,18 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           <span className="margin-title">{props.title}</span>
           <span className="margin-subtitle">{props.subtitle}</span>
         </div>
-        <button className="toolbar-button margin-create-button" type="button" onClick={() => insertBlock(null)}>
+        <button
+          className="toolbar-button margin-create-button"
+          type="button"
+          aria-label={copy.addButtonAriaLabel}
+          onClick={() => {
+            if (props.kind === "left" && props.onRequestCreateLinkedNote) {
+              props.onRequestCreateLinkedNote();
+              return;
+            }
+            insertBlock(null);
+          }}
+        >
           +
         </button>
       </div>
@@ -1350,7 +1430,7 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           <div className="editor-content-wrap margin-editor-content">
             <RichTextPlugin
               contentEditable={<ContentEditable className="lexical-editor" aria-label={`${props.title} editor`} />}
-              placeholder={<div className="lexical-placeholder margin-placeholder">Write in the margin...</div>}
+              placeholder={<div className="lexical-placeholder margin-placeholder">{copy.placeholder}</div>}
               ErrorBoundary={LexicalErrorBoundary}
             />
           </div>
@@ -1365,7 +1445,7 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
             linkIndexSave(json);
           }}
         />
-        <EnsureInitialBlockPlugin kind={props.kind} />
+        {props.kind === "right" ? <EnsureInitialBlockPlugin kind={props.kind} /> : null}
         <MarginBridgePlugin
           kind={props.kind}
           editorRef={editorRef}

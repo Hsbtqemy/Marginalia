@@ -9,6 +9,8 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 - Toute tache qui touche a l'export ou a la persistance doit inclure des tests.
 - Toute tache qui touche a Tauri doit inclure une verification manuelle Windows au minimum.
 - Tant que l'item `SEC-01` n'est pas traite, eviter d'etendre les usages HTML/libres dans l'app.
+- Tant que `SCH-03` n'est pas traite, ne pas pousser de refonte purement cosmetique de la marge gauche.
+- Tant que `SCH-02` et `SCH-03` ne sont pas traites, `UX-02` et `UX-03` restent des chantiers d'exploration encadree, pas des refontes a stabiliser.
 
 ## Vue d'ensemble
 
@@ -21,17 +23,31 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 | SEC-02 | P1 | Securite | Reduire les permissions Tauri au strict necessaire | S | Moyen |
 | DATA-02 | P1 | Donnees | Fiabiliser le systeme de migrations | M | Moyen |
 | QA-01 | P1 | Qualite | Poser un socle de tests automatise | M | Eleve |
+| ARCH-01 | P0 | Architecture | Formaliser le modele editorial par unites | M | Eleve |
+| SCH-01 | P0 | Produit/UX | Requalifier la marge gauche en scholies | M | Eleve |
+| SCH-02 | P0 | Architecture | Deriver un index d'unites depuis le modele actuel | M | Eleve |
+| SCH-03 | P0 | Robustesse | Garantir une seule scholie gauche par bloc manuscrit | M | Eleve |
+| MAN-01 | P0 | Editeur | Ajouter les operations de bloc cote manuscrit | L | Eleve |
+| PAIR-01 | P0 | Editeur | Coordonner les actions au niveau unite | L | Eleve |
+| PAIR-02 | P0 | UX | Introduire l'insertion explicite entre unites | M | Moyen |
+| PAIR-03 | P1 | UX | Autoriser la scholie vide, reduite ou developpee | S | Faible |
+| LAY-01 | P1 | UX/UI | Reequilibrer la grille en faveur du manuscrit | M | Moyen |
+| SAFE-01 | P1 | Robustesse | Garder un reorder fiable sans drag souris | S | Moyen |
+| MODEL-01 | P1 | Donnees | Introduire un modele canonique de document par unites | L | Eleve |
+| MODEL-02 | P1 | Donnees | Migrer les documents existants vers le modele d'unites | L | Eleve |
+| QA-02 | P1 | Qualite | Couvrir les invariants du modele scholies | M | Eleve |
 | EXP-01 | P1 | Produit | Documenter explicitement les limites de l'export DOCX | S | Faible |
 | EXP-02 | P2 | Export | Augmenter la fidelite de l'export DOCX | L | Moyen |
+| EXP-03 | P2 | Export | Aligner l'export avec les unites editoriales | M | Moyen |
 | UX-01 | P2 | UX | Remplacer `prompt/confirm` par des modales natives de l'app | M | Faible |
-| UX-02 | P1 | UX/UI | Recentrer l'app sur l'ecriture | L | Eleve |
-| UX-03 | P1 | UX/UI | Redessiner la marge comme un carnet de notes | L | Eleve |
+| UX-02 | P1 | UX/UI | Recentrer l'app sur l'ecriture par unites | L | Eleve |
+| UX-03 | P1 | UX/UI | Transformer la marge gauche en appareil de scholies | L | Eleve |
 | UX-04 | P1 | UX/UI | Reduire le bruit permanent et rendre l'aide contextuelle | M | Moyen |
 | UX-05 | P2 | UX/UI | Installer une direction visuelle editoriale complete | L | Moyen |
 | UX-06 | P2 | UX/UI | Recomposer la topbar et la navigation document | M | Moyen |
 | DX-01 | P2 | DX | Corriger les details de finition du projet | S | Faible |
 
-## Etat d'avancement (2026-04-01)
+## Etat d'avancement (2026-04-04)
 
 | ID | Statut |
 |---|---|
@@ -42,8 +58,22 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 | SEC-02 | done |
 | DATA-02 | done |
 | QA-01 | done |
+| ARCH-01 | done |
+| SCH-01 | done |
+| SCH-02 | done |
+| SCH-03 | todo |
+| MAN-01 | todo |
+| PAIR-01 | todo |
+| PAIR-02 | todo |
+| PAIR-03 | todo |
+| LAY-01 | todo |
+| SAFE-01 | todo |
+| MODEL-01 | todo |
+| MODEL-02 | todo |
+| QA-02 | todo |
 | EXP-01 | done |
 | EXP-02 | todo |
+| EXP-03 | todo |
 | UX-01 | done |
 | UX-02 | in progress |
 | UX-03 | in progress |
@@ -54,17 +84,682 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 
 ### Resume
 
-- done: 9
+- done: 13
 - in progress: 5
-- todo: 1
-- hors backlog initial (critique): stabilite UX autour du resize pointeur et de `New linked note` durcie dans le code et couverte par tests, verification manuelle Windows/Tauri encore a faire
+- todo: 11
+- hors backlog initial (critique): `New linked note` est durci et couvert par tests; le resize pointeur a replanete lors de la validation manuelle Windows/Tauri du 2026-04-02 et reste desactive en attendant une correction de fond
+- reorientation produit le 2026-04-04: `ARCH-01` est formalise; `UX-02`, `UX-03` et une partie de `UX-04` sont maintenant executes via le programme `scholies` ci-dessous
 
 ### Reste a faire priorise
 
-1. `UX-02`, `UX-03`, `UX-04`, `UX-06`: terminer la passe writer-first (hierarchie manuscrit, marge carnet, densite d'aides, topbar).
-2. `UX-05`: finaliser la signature visuelle editoriale (coherence globale + captures avant/apres).
-3. `EXP-02`: phase export DOCX fidelity apres stabilisation UX/QA.
-4. Hors backlog initial critique: valider manuellement sous Windows/Tauri les scenarios resize pointeur, changement de document et `New linked note`.
+1. `SCH-03`: implementer l'invariant restant du cadre editorial fixe par `ARCH-01` avant de pousser plus loin le redesign.
+2. `MAN-01`, `PAIR-01`, `PAIR-02`, `PAIR-03`, `SAFE-01`: faire passer l'app d'un manuscrit continu annote a une suite d'unites `bloc + scholie`.
+3. `LAY-01`, `UX-04`, `UX-05`, `UX-06`: retendre la hierarchie visuelle et la chrome autour du nouveau modele.
+4. `MODEL-01`, `MODEL-02`, `QA-02`: basculer la persistance et la couverture de tests vers le modele d'unites une fois l'UX validee.
+5. `EXP-03`, puis `EXP-02`: aligner l'export avec les unites editoriales avant d'augmenter la fidelite DOCX.
+6. Hors backlog initial critique: corriger le crash du resize pointeur sous Windows/Tauri, puis revalider les scenarios resize, changement de document et `New linked note`.
+
+---
+
+## Validation manuelle Windows/Tauri
+
+### Checklist critique - resize pointeur et `New linked note`
+
+**Pre-requis**
+
+- lancer `npm run tauri:dev` sur Windows
+- ouvrir au moins deux documents de test
+- verifier que les trois panneaux sont visibles au moins une fois pendant la passe
+
+**CRIT-02 - Resize pointeur**
+
+1. Resize gauche, relacher dans la fenetre
+   - attendu: la taille change
+   - attendu: le curseur revient a la normale apres relachement
+   - attendu: tous les clics restent fonctionnels
+   - resultat 2026-04-02: KO, l'app replante comme lors de la passe precedente; le resize pointeur reste desactive apres rollback de securite
+2. Resize gauche, relacher hors fenetre
+   - attendu: aucun etat bloque au retour dans la fenetre
+   - attendu: le curseur n'est pas fige en `col-resize`
+3. Resize droite, puis `Alt+Tab`
+   - attendu: retour dans l'app sans gel d'input
+   - attendu: les panneaux restent interactifs
+4. Resize puis `Escape`
+   - attendu: fin immediate du resize
+   - attendu: aucune capture pointeur residuelle visible
+5. Resize puis changement de document
+   - attendu: changement de document normal
+   - attendu: aucun panneau ne reste dans un etat de resize
+
+**CRIT-03 - `New linked note`**
+
+1. Depuis une selection manuscrit existante
+   - action: declencher `New linked note`
+   - attendu: une seule note liee est creee
+   - attendu: elle pointe vers le bon block manuscrit
+   - attendu: le focus final est dans la note
+2. Sans block manuscrit courant clair
+   - action: declencher `New linked note`
+   - attendu: un passage manuscrit est cree ou reutilise une seule fois
+   - attendu: pas de doublon manuscrit / note
+3. Declenchement suivi d'un changement de document
+   - action: lancer `New linked note`, puis changer immediatement de document
+   - attendu: rien n'est cree dans le mauvais document
+   - attendu: aucun freeze ni erreur visible
+4. Declenchement via plusieurs entrees
+   - action: tester au minimum toolbar et palette de commandes
+   - attendu: meme comportement et meme resultat final
+
+**Critere de cloture**
+
+- aucun clic bloque
+- aucun curseur fige
+- aucun doublon de passage ou de note liee
+- aucun artefact sur changement de document
+- si un scenario casse: noter scenario exact, document, sequence, resultat observe
+
+---
+
+## Programme Scholies - priorite produit 2026-04-04
+
+Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evoluer Marginalia vers un modele de document compose d'unites editoriales, plutot que d'un manuscrit continu accompagne de notes plus ou moins libres.
+
+### Principes de conception
+
+- Une unite = `1 bloc principal + 1 scholie gauche maximum + 0/1 scholie vide`.
+- L'ajout d'une unite est explicite: l'utilisateur choisit ou inserer un nouveau bloc.
+- Les actions structurelles portent sur l'unite complete: ajouter, supprimer, dupliquer, deplacer.
+- La scholie gauche est un commentaire situe, pas un objet autonome de type "carte".
+- Le panneau droit reste un espace secondaire de sources, annexes ou citations tant que le nouveau modele n'est pas stabilise.
+
+### Base existante a reutiliser
+
+- Le manuscrit sait deja identifier ses blocs via `blockId` dans `src/editors/manuscript/lexicalBlocks/manuscriptBlockUtils.ts`.
+- La marge gauche a deja un vrai noeud de bloc avec `marginBlockId` et `linkedManuscriptBlockId` dans `src/editors/margin/marginaliaBlocks/MarginaliaBlockNode.ts`.
+- La marge sait deja inserer, deplacer, supprimer, dupliquer, scinder et fusionner ses blocs dans `src/editors/margin/marginaliaBlocks/commands.ts`.
+- L'app sait deja coordonner la creation d'une note liee via `src/app/linkedMarginalia.ts` et `src/app/App.tsx`.
+- La persistance actuelle est encore separee en trois etats `manuscriptJson`, `leftMarginJson`, `rightMarginJson` dans `src/db/queries.ts` et `src/state/useAppStore.ts`.
+
+### Ordre recommande
+
+1. Implementer le vocabulaire et les invariants a partir de `ARCH-01`: `SCH-01`, `SCH-02`, `SCH-03`.
+2. Introduire les operations de structure cote manuscrit puis au niveau unite: `MAN-01`, `PAIR-01`, `PAIR-02`, `PAIR-03`.
+3. Recomposer l'interface autour des unites et de la lecture: `LAY-01`, `UX-04`, `UX-06`, `UX-05`.
+4. Seulement apres validation manuelle du nouveau comportement, basculer la persistance: `MODEL-01`, `MODEL-02`.
+5. Fermer avec `QA-02` et `EXP-03`, puis reprendre `EXP-02`.
+
+### ARCH-01 - Formaliser le modele editorial par unites
+
+**Statut**
+
+- done le 2026-04-04
+
+**Pourquoi**
+
+- Le code actuel pense encore en termes de "manuscrit + marges".
+- Sans invariant produit explicite, chaque retouche UX risque de repartir vers un modele de notes libres.
+
+**Objectif**
+
+- Definir noir sur blanc la structure cible: unite, scholie, insertion, suppression, deplacement, duplication, panneau droit.
+
+**Decision centrale**
+
+- Le document cible n'est plus pense comme une page infinie accompagnee de marges semi-autonomes.
+- Le document cible est une sequence ordonnee d'unites editoriales.
+- Une unite editoriale est ancree par un bloc manuscrit et peut porter au plus une scholie gauche.
+- La scholie gauche est un commentaire associe au bloc, pas une note libre de premier rang.
+- Le panneau droit reste secondaire pendant la transition et ne definit pas l'unite editoriale.
+
+**Invariants verrouilles**
+
+1. Le document est compose d'une sequence finie et ordonnee d'unites.
+2. Chaque unite possede exactement un bloc principal manuscrit.
+3. Chaque unite peut posseder zero ou une scholie gauche, jamais plus.
+4. Une scholie gauche peut etre vide, reduite ou developpee; son existence ne doit pas forcer un contenu immediat.
+5. L'ordre des unites est l'ordre des blocs manuscrit; la scholie suit cet ordre et ne le pilote pas.
+6. Ajouter une unite signifie inserer explicitement un nouveau bloc principal a un endroit choisi du document.
+7. Supprimer une unite supprime le bloc principal et sa scholie associee.
+8. Deplacer une unite deplace le bloc principal et sa scholie associee comme un ensemble logique.
+9. Dupliquer une unite duplique le bloc principal et sa scholie associee avec de nouveaux identifiants.
+10. Un bloc manuscrit sans scholie reste une unite valide.
+11. Une scholie gauche sans bloc manuscrit correspondant n'est pas un etat cible valide.
+12. Le panneau droit n'entre pas dans l'invariant d'unite tant que `MODEL-01` n'a pas redefini son role.
+
+**Types de blocs concernes**
+
+- Sont des blocs principaux eligibles:
+  - paragraphe top-level;
+  - titre top-level;
+  - citation top-level;
+  - item de liste top-level.
+- La granularite cible reste donc le bloc editorial deja present dans le manuscrit, pas la phrase ni la page.
+
+**Non-objectifs explicites**
+
+- Ne pas transformer le produit en page infinie ou en canvas libre.
+- Ne pas autoriser plusieurs scholies gauches simultanees pour un meme bloc manuscrit.
+- Ne pas remodeler le panneau droit comme seconde scholie avant d'avoir stabilise le panneau gauche.
+- Ne pas rendre le drag souris obligatoire pour les operations de structure.
+- Ne pas migrer la base avant d'avoir valide l'ergonomie du modele derive.
+
+**Regles de transition**
+
+1. Tant que `MODEL-01` n'est pas traite, l'app continue de persister `manuscriptJson`, `leftMarginJson` et `rightMarginJson` separement.
+2. Tant que `SCH-02` n'est pas traite, l'UI continue de fonctionner sur le modele existant, avec une projection derivee a introduire.
+3. Tant que `SCH-03` n'est pas traite, des documents herites peuvent encore contenir plusieurs notes liees a un meme bloc; cet etat doit etre considere comme legacy et non comme un comportement produit valide.
+4. Tant que `SAFE-01` n'est pas ferme, les operations de structure doivent rester faisables sans drag pointeur.
+
+**Cas limites a encadrer**
+
+1. Si l'utilisateur cree une scholie sur un bloc qui en a deja une, l'action doit reutiliser ou focaliser la scholie existante plutot que creer un doublon.
+2. Si un document ancien contient plusieurs scholies gauches pour un meme bloc, `SCH-03` doit definir la regle de normalisation ou de priorisation.
+3. Si l'utilisateur insere une unite sans selection courante, l'app doit utiliser un point d'insertion explicite ou un fallback clair.
+4. Si l'utilisateur supprime le contenu textuel d'une scholie, l'unite reste valide tant que le bloc manuscrit existe.
+5. Si le bloc manuscrit est deplace, la scholie reste associee au meme `blockId` ou a son equivalent apres operation structurelle.
+
+**Implications UI**
+
+1. Le CTA primaire n'est plus conceptuellement `New Note`, mais `ajouter une unite`, `ajouter un bloc` ou `ajouter une scholie a un bloc`.
+2. La marge gauche ne doit plus se presenter comme un tableau de cartes autonomes.
+3. Les actions `supprimer`, `dupliquer`, `deplacer` doivent etre pensees d'abord au niveau unite, puis exposees dans les outils.
+4. L'etat vide du document doit encourager la construction bloc par bloc.
+5. `UX-02` et `UX-03` ne peuvent etre stabilises qu'en respectant ces invariants.
+
+**Travaux**
+
+1. Figer les invariants fonctionnels du couple `bloc principal + scholie`.
+2. Definir ce qui est autorise ou non:
+   - maximum une scholie gauche par bloc manuscrit;
+   - scholie gauche vide autorisee;
+   - insertion explicite entre deux unites;
+   - suppression/deplacement/duplication au niveau unite.
+3. Decider le role du panneau droit pendant la transition:
+   - annexe de sources;
+   - citations;
+   - ou simple panneau secondaire non structurel.
+4. Lister les ecrans et commandes a re-scoper: toolbar manuscrit, toolbar marge, palette, topbar, placeholders.
+
+**Definition of done**
+
+- Les invariants sont documentes dans ce backlog et servent de reference.
+- Les nouveaux tickets `SCH-*`, `PAIR-*`, `MODEL-*` sont valides par rapport a ces invariants.
+- Les non-objectifs et cas limites principaux sont explicites.
+- Les tickets UX ouverts n'entrent pas en contradiction avec ce cadre.
+
+**Dependances**
+
+- Aucune.
+
+---
+
+### SCH-01 - Requalifier la marge gauche en scholies
+
+**Statut**
+
+- done le 2026-04-04
+
+**Pourquoi**
+
+- Le composant de marge est encore concu comme un espace de notes libres, avec vocabulaire et affordances de type "note".
+- Le noeud `marginalia-block` sait deja porter un lien, mais pas encore un statut de scholie au sens produit.
+
+**Objectif**
+
+- Faire de la marge gauche un espace de scholies associees au texte, meme avant migration complete du modele.
+
+**Travaux**
+
+1. Revoir le vocabulaire UI:
+   - remplacer `New Note`, `Free note`, `Linked note` par un lexique coherent avec les scholies.
+2. Revoir les placeholders et textes de guidage dans `ManuscriptEditor` et `MarginEditorBase`.
+3. Distinguer clairement:
+   - scholie associee a un bloc;
+   - annexe libre eventuelle, si elle subsiste pendant la transition.
+4. Ajouter un marqueur discret d'association au bloc source sans rebasculer vers une "carte" riche en chrome.
+
+**Definition of done**
+
+- La marge gauche ne se presente plus comme un carnet de notes generique.
+- Le vocabulaire visible pour l'utilisateur est coherent avec l'idee de scholie.
+- Aucun element important de l'UI ne contredit le modele `bloc + scholie`.
+
+**Dependances**
+
+- `ARCH-01`.
+
+---
+
+### SCH-02 - Deriver un index d'unites depuis le modele actuel
+
+**Statut**
+
+- done le 2026-04-04
+
+**Pourquoi**
+
+- La persistance est encore scindee entre manuscrit, marge gauche et marge droite.
+- Il faut pouvoir prototyper l'interface cible sans lancer trop tot une migration de donnees.
+
+**Objectif**
+
+- Construire, a l'execution, une vue derivee des unites a partir des `blockId` manuscrit et des liens de marge gauche.
+
+**Travaux**
+
+1. Introduire un helper de projection qui reconstitue des unites a partir de:
+   - `manuscriptJson`;
+   - `leftMarginJson`;
+   - `leftLinksByManuscriptBlockId`.
+2. Definir la forme de cette projection:
+   - `unitId`;
+   - `manuscriptBlockId`;
+   - `leftMarginBlockId | null`;
+   - ordre;
+   - extrait ou meta utiles a l'UI.
+3. Brancher cette projection dans `App.tsx` ou dans un module derive dedie, sans casser le store existant.
+4. Documenter clairement que cette projection reste transitoire tant que `MODEL-01` n'est pas traite.
+
+**Definition of done**
+
+- L'app peut raisonner en "unites" sans encore changer la base.
+- La projection est stable sur reload et sur changement de document.
+- Les ecrans futurs peuvent consommer cette vue derivee au lieu de recalculer localement des associations.
+
+**Dependances**
+
+- `ARCH-01`.
+
+---
+
+### SCH-03 - Garantir une seule scholie gauche par bloc manuscrit
+
+**Pourquoi**
+
+- Le flux `New linked note` cree aujourd'hui une note liee, mais ne garantit pas encore le modele `1 bloc = 1 scholie gauche max`.
+- Sans cet invariant, toute UI par unites restera fragile.
+
+**Objectif**
+
+- Faire de la marge gauche un commentaire unique associe a chaque bloc principal.
+
+**Travaux**
+
+1. Modifier `createLinkedMarginaliaScheduler` et les commandes de marge pour reutiliser une scholie existante au lieu de creer un doublon.
+2. Definir le comportement si plusieurs scholies liees existent deja sur un document ancien:
+   - ouvrir la premiere;
+   - signaler l'anomalie;
+   - ou lancer une normalisation.
+3. Ajouter une normalisation de lecture pour les documents herites si necessaire.
+4. Couvrir les cas suivants:
+   - creation repetee depuis la toolbar;
+   - creation via palette;
+   - changement rapide de document;
+   - document ancien avec doublons.
+
+**Definition of done**
+
+- `New linked note` ne cree plus de doublon gauche pour un meme `blockId`.
+- Un document ancien avec doublons ne plante pas et suit une regle definie.
+- Les tests couvrent cet invariant.
+
+**Dependances**
+
+- `ARCH-01`
+- `SCH-02`
+
+---
+
+### MAN-01 - Ajouter les operations de bloc cote manuscrit
+
+**Pourquoi**
+
+- Le manuscrit sait deja creer ou cibler un bloc, mais pas encore se comporter comme une suite d'unites manipulables.
+- Tant que les operations de structure n'existent que cote marge, on reste dans un modele asymetrique.
+
+**Objectif**
+
+- Permettre au manuscrit de manipuler explicitement ses blocs comme des fragments ordonnes.
+
+**Travaux**
+
+1. Ajouter les primitives cote manuscrit:
+   - inserer un bloc avant/apres;
+   - supprimer le bloc courant;
+   - dupliquer le bloc courant;
+   - deplacer le bloc courant vers le haut ou le bas.
+2. Reutiliser `blockId` comme cle structurelle stable.
+3. Definir le comportement sur les listes top-level, titres, citations et paragraphes.
+4. Ajouter des commandes et raccourcis clavier seulement si l'UX reste lisible.
+
+**Definition of done**
+
+- Le manuscrit peut etre construit bloc par bloc sans hacks de selection.
+- Les operations marchent sur les types de blocs deja supportes.
+- Les ids de blocs restent stables apres deplacement ou duplication.
+
+**Dependances**
+
+- `ARCH-01`
+- `SCH-02`
+
+---
+
+### PAIR-01 - Coordonner les actions au niveau unite
+
+**Pourquoi**
+
+- Les operations de marge et de manuscrit sont encore majoritairement separees.
+- Le produit cible demande que les actions structurelles portent sur le couple `bloc + scholie`.
+
+**Objectif**
+
+- Introduire un coordinateur d'actions capable de manipuler une unite complete.
+
+**Travaux**
+
+1. Ajouter dans `App.tsx` ou un module dedie des actions de haut niveau:
+   - `createUnitAfter`
+   - `deleteCurrentUnit`
+   - `duplicateCurrentUnit`
+   - `moveCurrentUnitUp`
+   - `moveCurrentUnitDown`
+2. Faire cooperer `ManuscriptEditorHandle` et `LeftMarginEditorHandle` pour ces actions.
+3. Preserver le focus utilisateur apres chaque action.
+4. Definir les regles pour les unites sans scholie et pour les documents herites.
+
+**Definition of done**
+
+- Une action structurelle sur le manuscrit emporte sa scholie gauche associee.
+- Le resultat reste correct apres autosave, reload et changement de document.
+- Les commandes niveau unite sont centralisees dans une seule couche.
+
+**Dependances**
+
+- `MAN-01`
+- `SCH-03`
+
+---
+
+### PAIR-02 - Introduire l'insertion explicite entre unites
+
+**Pourquoi**
+
+- Ton modele demande un geste explicite de construction.
+- Aujourd'hui, la creation passe surtout par la selection courante et `New linked pair`.
+
+**Objectif**
+
+- Faire de l'ajout de bloc une action situee entre deux unites, lisible et maitrisable.
+
+**Travaux**
+
+1. Introduire une affordance d'insertion entre blocs manuscrit:
+   - bouton `+` discret entre unites;
+   - ou commande contextuelle apparue au focus/hover.
+2. Faire que cette action cree:
+   - un bloc manuscrit vide;
+   - une scholie associee vide ou reduite.
+3. Verifier les etats:
+   - document vide;
+   - insertion en debut;
+   - insertion entre deux unites;
+   - insertion en fin.
+4. Maintenir un chemin clavier et palette pour les utilisateurs rapides.
+
+**Definition of done**
+
+- L'utilisateur peut construire explicitement son document par unites.
+- L'ajout d'un bloc n'oblige plus a passer par une selection preexistante.
+- Le document vide devient un point de depart clair pour ce modele.
+
+**Dependances**
+
+- `MAN-01`
+- `PAIR-01`
+
+---
+
+### PAIR-03 - Autoriser la scholie vide, reduite ou developpee
+
+**Pourquoi**
+
+- Si chaque bloc impose une scholie pleine, l'ecriture devient trop lourde.
+- Il faut garder la structure ferme tout en laissant l'edition souple.
+
+**Objectif**
+
+- Faire de la scholie un element associe mais non intrusif.
+
+**Travaux**
+
+1. Definir trois etats simples:
+   - vide;
+   - reduite;
+   - developpee.
+2. Choisir comment ces etats s'expriment visuellement sans chrome excessif.
+3. Conserver l'association au bloc meme quand la scholie est vide.
+4. Verifier que la suppression d'une scholie vide ne casse pas l'unite.
+
+**Definition of done**
+
+- Une unite peut exister avec une scholie vide.
+- La scholie n'impose pas un rituel d'edition a chaque ajout de bloc.
+- Les etats sont lisibles sans saturer la marge.
+
+**Dependances**
+
+- `SCH-01`
+- `PAIR-02`
+
+---
+
+### LAY-01 - Reequilibrer la grille en faveur du manuscrit
+
+**Pourquoi**
+
+- La grille actuelle reste celle de trois panneaux equivalents ou presque.
+- Une scholie doit vivre au bord du texte, pas rivaliser avec lui comme un deuxieme editeur principal.
+
+**Objectif**
+
+- Faire du manuscrit la colonne dominante, avec une marge gauche plus fine, plus typographique et moins "app".
+
+**Travaux**
+
+1. Revoir `ThreePaneLayout` et les largeurs par defaut pour que le centre domine clairement.
+2. Sortir la marge gauche du look "cartes" actuel:
+   - moins de fonds pleins;
+   - moins de bordures lourdes;
+   - moins de badges;
+   - plus de typographie et de rythme vertical.
+3. Reduire la masse visuelle des toolbars et des chips autour de la marge.
+4. Verifier la coherence sur document vide, document long et `Untitled Draft`.
+
+**Definition of done**
+
+- Au premier regard, le manuscrit domine l'ecran.
+- La marge gauche accompagne la lecture au lieu de ressembler a un panneau d'objets.
+- Les differences de disposition entre documents restent sous controle.
+
+**Dependances**
+
+- `SCH-01`
+- `PAIR-02`
+
+---
+
+### SAFE-01 - Garder un reorder fiable sans drag souris
+
+**Pourquoi**
+
+- Le drag souris reste instable sous Tauri/WebView2.
+- Le modele par unites a besoin d'un reorder fiable, mais pas necessairement souris en premier.
+
+**Objectif**
+
+- Assurer le deplacement d'unites par clavier et commandes tant que le drag pointeur n'est pas digne de confiance.
+
+**Travaux**
+
+1. Conserver le drag souris desactive tant qu'une validation Windows ne le ferme pas.
+2. Renforcer les commandes de deplacement clavier/boutons pour qu'elles couvrent le besoin principal.
+3. Verifier que le reorder d'unite agit bien sur le bloc principal et sa scholie.
+4. Documenter la reouverture eventuelle du drag souris comme un ticket separe.
+
+**Definition of done**
+
+- Le produit permet de reordonner les unites sans drag souris.
+- Aucun scenario critique ne depend du pointer drag.
+- Le backlog distingue bien securisation et confort souris.
+
+**Dependances**
+
+- `PAIR-01`
+
+---
+
+### MODEL-01 - Introduire un modele canonique de document par unites
+
+**Pourquoi**
+
+- La projection derivee `SCH-02` suffira pour prototyper, pas pour stabiliser durablement le produit.
+- Le stockage en trois etats separes rend les invariants d'unites fragiles.
+
+**Objectif**
+
+- Donner au document un modele persistant centre sur l'unite editoriale.
+
+**Travaux**
+
+1. Choisir la forme canonique:
+   - table `document_units`;
+   - ou JSON structure unique;
+   - avec ordre, `unitId`, bloc principal et scholie associee.
+2. Documenter le choix au regard de l'existant SQLite/Tauri.
+3. Definir comment le panneau droit s'articule avec ce modele.
+4. Introduire un repository ou service de lecture/ecriture dedie.
+
+**Definition of done**
+
+- Le modele de persistance cible est choisi et documente.
+- Les invariants produit y sont representables sans contorsion.
+- Un plan de migration concret vers ce modele existe.
+
+**Dependances**
+
+- `ARCH-01`
+- validation UX initiale de `PAIR-01` et `PAIR-02`
+
+---
+
+### MODEL-02 - Migrer les documents existants vers le modele d'unites
+
+**Pourquoi**
+
+- Le projet a deja des documents stockes selon l'ancien modele.
+- Une refonte de donnees sans migration casserait la confiance utilisateur.
+
+**Objectif**
+
+- Convertir les documents existants sans perte de contenu ni corruption des liens.
+
+**Travaux**
+
+1. Ecrire la strategie de migration depuis:
+   - `manuscript_states`;
+   - `margin_left_states`;
+   - `margin_right_states`.
+2. Definir la regle pour les cas ambigus:
+   - doublons de scholies;
+   - notes libres non liees;
+   - blocs manuscrit sans scholie;
+   - scholies sans bloc manuscrit valide.
+3. Ajouter un mode lecture/normalisation pour les anciens documents tant que la migration n'est pas finalisee.
+4. Tester la migration sur des fixtures representatifs.
+
+**Definition of done**
+
+- Un document existant peut etre ouvert dans le nouveau modele sans perte manifeste.
+- Les cas ambigus suivent une regle explicite et testee.
+- Le rollback ou la compatibilite de lecture est defini.
+
+**Dependances**
+
+- `MODEL-01`
+- `QA-02`
+
+---
+
+### QA-02 - Couvrir les invariants du modele scholies
+
+**Pourquoi**
+
+- Le futur comportement repose sur des invariants plus stricts que l'etat actuel.
+- Ces invariants doivent etre testes avant et pendant la migration du modele.
+
+**Objectif**
+
+- Avoir des tests qui protgent explicitement le couple `bloc + scholie`.
+
+**Travaux**
+
+1. Ajouter des tests sur:
+   - unicite de la scholie gauche par `blockId`;
+   - creation d'unite;
+   - suppression d'unite;
+   - duplication d'unite;
+   - deplacement d'unite;
+   - migration de documents anciens.
+2. Ajouter au moins un scenario d'integration couvrant la coordination `App + manuscrit + marge gauche`.
+3. Etendre les fixtures de donnees pour les cas herites et ambigus.
+
+**Definition of done**
+
+- Les invariants du modele scholies sont couverts par des tests nommes explicitement.
+- Une regression sur la relation `bloc principal <-> scholie` casse la suite de tests.
+- La migration de donnees a des fixtures de reference.
+
+**Dependances**
+
+- `SCH-03`
+- `PAIR-01`
+- `MODEL-01`
+
+---
+
+### EXP-03 - Aligner l'export avec les unites editoriales
+
+**Pourquoi**
+
+- Si le produit devient une suite d'unites, l'export ne peut plus raisonner seulement comme un manuscrit principal accompagne d'annexes.
+
+**Objectif**
+
+- Faire de l'export un reflet du nouvel ordre editorial.
+
+**Travaux**
+
+1. Definir comment une unite se traduit en PDF/print preview et en DOCX.
+2. Decider si la scholie est:
+   - inline;
+   - en note;
+   - en annexe;
+   - ou configurable selon le profil.
+3. Adapter les payloads d'export quand `MODEL-01` sera en place.
+4. Ajouter une matrice de sortie `unite -> export`.
+
+**Definition of done**
+
+- L'export respecte l'ordre des unites editoriales.
+- Le role de la scholie dans les sorties est explicite et documente.
+- La nouvelle logique ne reintroduit pas de lecture implicite de trois etats de document separes.
+
+**Dependances**
+
+- `MODEL-01`
+- `MODEL-02`
+- idealement apres `QA-02`
 
 ---
 
@@ -403,35 +1098,36 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 
 ---
 
-### UX-02 - Recentrer l'app sur l'ecriture
+### UX-02 - Recentrer l'app sur l'ecriture par unites
 
 **Pourquoi**
 
 - Le manuscrit n'est pas encore la zone dominante de l'interface.
-- L'app ressemble davantage a un outil de debug/edition qu'a un environnement d'ecriture.
+- L'app ressemble davantage a un outil de debug/edition qu'a un environnement de composition par fragments.
 
 **Objectif**
 
-- Faire du texte l'element visuel principal, avec une vraie colonne d'ecriture et une hierarchie claire.
+- Faire du texte l'element visuel principal, avec une vraie colonne d'ecriture et une hierarchie claire au service d'une suite d'unites editoriales.
 
 **Travaux**
 
-1. Redefinir la hierarchie des surfaces: manuscrit premier plan, outils second plan, aides troisieme plan.
-2. Donner au centre une vraie largeur editoriale stable, meme hors mode page preview.
-3. Revoir les espacements, marges et hauteurs de lignes pour obtenir un rythme de lecture/ecriture plus calme.
-4. Diminuer le contraste et la masse visuelle des toolbars par rapport au texte.
+1. S'appuyer sur `ARCH-01`, puis executer `MAN-01`, `PAIR-01`, `PAIR-02` et `LAY-01`.
+2. Faire du manuscrit la colonne dominante, meme hors mode page preview.
+3. Repenser les ecrans vides et les gestes de construction pour un document par unites.
+4. Diminuer la masse visuelle des outils par rapport au texte.
 5. Verifier que la vue par defaut est accueillante sur document vide comme sur document long.
 
 **Definition of done**
 
 - Au premier regard, le manuscrit domine clairement l'ecran.
-- Le centre ne ressemble plus a un panneau d'outil sombre.
+- Le centre ne ressemble plus a un panneau d'outil.
 - La zone de texte garde une largeur et une respiration coherentes en desktop.
+- Les actions de structure principales se comprennent comme des actions sur une unite.
 
 **Livrables**
 
 - Refonte des surfaces du centre.
-- Ajustements CSS de hierarchie et de rythme.
+- Ajustements CSS et actions structurelles alignes sur le modele par unites.
 - Validation visuelle sur ecran vide et ecran rempli.
 
 **Dependances**
@@ -440,35 +1136,35 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 
 ---
 
-### UX-03 - Redessiner la marge comme un carnet de notes
+### UX-03 - Transformer la marge gauche en appareil de scholies
 
 **Pourquoi**
 
-- La marge gauche fonctionne, mais son langage visuel actuel est celui d'une toolbar geante.
-- Elle ne valorise pas assez les notes elles-memes ni leur relation avec le manuscrit.
+- La marge gauche fonctionne, mais son langage visuel actuel reste celui d'un panneau de notes ou de commandes.
+- Elle ne valorise pas assez la relation structurelle entre un bloc de texte et sa scholie.
 
 **Objectif**
 
-- Faire de la marge un espace de pensee lisible, agreable et oriente contenu.
+- Faire de la marge gauche un appareil critique discret, lie au texte, lisible et typographique.
 
 **Travaux**
 
-1. Passer d'une grille d'actions permanente a une presentation d'abord centree sur les blocs de notes.
-2. Grouper les actions par niveau: creation, liaison, structure, danger.
-3. Rendre les metadonnees de note plus discretes et plus editoriales.
-4. Mieux mettre en scene l'extrait du passage lie et l'etat de liaison.
-5. Introduire des actions secondaires en hover, menu contextuel ou palette si necessaire.
+1. Executer `SCH-01`, `SCH-03`, `PAIR-03` et `LAY-01`.
+2. Faire passer la marge d'un espace "notes" a un espace de scholies associees.
+3. Rendre les metadonnees de liaison plus discretes et plus editoriales.
+4. Mieux mettre en scene l'extrait du passage lie sans reintroduire une "carte".
+5. Deplacer les actions secondaires hors de la vue primaire si necessaire.
 
 **Definition of done**
 
-- La marge ressemble a un carnet annexe, pas a un panneau de commandes.
-- Les notes sont plus lisibles que les boutons.
+- La marge ressemble a un bord critique du texte, pas a un panneau de commandes.
+- Les scholies sont plus lisibles que les boutons.
 - Les actions critiques restent accessibles sans saturer la vue.
 
 **Livrables**
 
 - Recomposition de la marge.
-- Etats de note plus lisibles.
+- Etats de scholie plus lisibles.
 - Strategie d'actions secondaires documentee.
 
 **Dependances**
@@ -753,12 +1449,13 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 
 **Titre**
 
-- Recentrer Marginalia sur le manuscrit
+- Recentrer Marginalia sur l'ecriture par unites
 
 **Checklist**
 
 - [ ] Colonne de manuscrit plus editoriale
 - [ ] Hierarchie visuelle recentree sur le texte
+- [ ] Gestes de construction par unite clarifies
 - [ ] Toolbars declasses visuellement
 - [ ] Validation ecran vide / ecran rempli
 
@@ -766,12 +1463,13 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 
 **Titre**
 
-- Transformer la marge en carnet de notes
+- Transformer la marge en appareil de scholies
 
 **Checklist**
 
+- [ ] Vocabulaire de scholies coherent
 - [ ] Actions moins dominantes
-- [ ] Blocs de notes plus lisibles
+- [ ] Scholies plus lisibles que la chrome
 - [ ] Etats de liaison mieux mis en scene
 - [ ] Actions secondaires deplacees hors de la vue primaire
 

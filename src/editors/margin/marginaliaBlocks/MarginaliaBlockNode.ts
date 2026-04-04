@@ -33,6 +33,18 @@ const MARGINALIA_CONTENT_SLOT_SELECTOR = '[data-marginalia-content-slot="true"]'
 const MARGINALIA_META_SELECTOR = '[data-marginalia-meta="true"]';
 const MARGINALIA_PREVIEW_SELECTOR = '[data-marginalia-preview="true"]';
 
+function formatBlockMeta(kind: MarginKind, linkedManuscriptBlockId: string | null): string {
+  if (kind === "left") {
+    return linkedManuscriptBlockId
+      ? `Scholie on ${linkedManuscriptBlockId.slice(0, 8)}`
+      : "Awaiting passage";
+  }
+
+  return linkedManuscriptBlockId
+    ? `Source on ${linkedManuscriptBlockId.slice(0, 8)}`
+    : "Source note";
+}
+
 function createBlockHandle(marginBlockId: string): HTMLButtonElement {
   const handle = document.createElement("button");
   handle.type = "button";
@@ -56,7 +68,7 @@ function createBlockHeader(marginBlockId: string): HTMLDivElement {
   const meta = document.createElement("span");
   meta.className = "marginalia-block-meta";
   meta.dataset.marginaliaMeta = "true";
-  meta.textContent = "Free note";
+  meta.textContent = "Source note";
   header.append(createBlockHandle(marginBlockId));
   header.append(meta);
   return header;
@@ -173,9 +185,7 @@ export class MarginaliaBlockNode extends ElementNode {
     element.append(createBlockHeader(this.__marginBlockId), createBlockPreview(), createBlockContentSlot());
     const meta = element.querySelector<HTMLElement>(MARGINALIA_META_SELECTOR);
     if (meta) {
-      meta.textContent = this.__linkedManuscriptBlockId
-        ? `Linked passage ${this.__linkedManuscriptBlockId.slice(0, 8)}`
-        : "Free note";
+      meta.textContent = formatBlockMeta(this.__kind, this.__linkedManuscriptBlockId);
     }
     const preview = element.querySelector<HTMLElement>(MARGINALIA_PREVIEW_SELECTOR);
     if (preview) {
@@ -215,9 +225,7 @@ export class MarginaliaBlockNode extends ElementNode {
 
     const meta = dom.querySelector<HTMLElement>(MARGINALIA_META_SELECTOR);
     if (meta) {
-      meta.textContent = this.__linkedManuscriptBlockId
-        ? `Linked passage ${this.__linkedManuscriptBlockId.slice(0, 8)}`
-        : "Free note";
+      meta.textContent = formatBlockMeta(this.__kind, this.__linkedManuscriptBlockId);
     }
     const preview = dom.querySelector<HTMLElement>(MARGINALIA_PREVIEW_SELECTOR);
     if (preview) {

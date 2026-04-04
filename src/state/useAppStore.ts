@@ -2,6 +2,10 @@ import type Database from "@tauri-apps/plugin-sql";
 import type { Store } from "@tauri-apps/plugin-store";
 import { create } from "zustand";
 import type { DocumentRecord } from "../db/queries";
+import {
+  EMPTY_EDITORIAL_UNIT_PROJECTION,
+  type EditorialUnitProjection,
+} from "../document/editorialUnits";
 import type { ExportPresetRecord } from "../presets/presetSchema";
 
 export type ThemeMode = "system" | "light" | "dark";
@@ -42,6 +46,52 @@ function marginLinkIndexEquals(a: MarginLinkIndex, b: MarginLinkIndex): boolean 
   return true;
 }
 
+function stringArrayEquals(a: string[], b: string[]): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function editorialUnitProjectionEquals(a: EditorialUnitProjection, b: EditorialUnitProjection): boolean {
+  if (a === b) {
+    return true;
+  }
+
+  if (a.units.length !== b.units.length) {
+    return false;
+  }
+
+  for (let index = 0; index < a.units.length; index += 1) {
+    const left = a.units[index];
+    const right = b.units[index];
+    if (
+      left.unitId !== right.unitId ||
+      left.order !== right.order ||
+      left.manuscriptBlockId !== right.manuscriptBlockId ||
+      left.manuscriptExcerpt !== right.manuscriptExcerpt ||
+      left.leftMarginBlockId !== right.leftMarginBlockId ||
+      !stringArrayEquals(left.duplicateLeftMarginBlockIds, right.duplicateLeftMarginBlockIds)
+    ) {
+      return false;
+    }
+  }
+
+  return (
+    stringArrayEquals(a.unlinkedLeftMarginBlockIds, b.unlinkedLeftMarginBlockIds) &&
+    stringArrayEquals(a.staleLinkedLeftMarginBlockIds, b.staleLinkedLeftMarginBlockIds) &&
+    stringArrayEquals(a.indexMismatchManuscriptBlockIds, b.indexMismatchManuscriptBlockIds)
+  );
+}
+
 interface AppState {
   db: Database | null;
   prefsStore: Store | null;
@@ -64,12 +114,16 @@ interface AppState {
   rightCurrentBlockId: string | null;
   leftLinksByManuscriptBlockId: MarginLinkIndex;
   rightLinksByManuscriptBlockId: MarginLinkIndex;
+  editorialUnitProjection: EditorialUnitProjection;
   setDb: (db: Database) => void;
   setPrefsStore: (store: Store) => void;
   setInitialized: (initialized: boolean) => void;
   setDocuments: (documents: DocumentRecord[]) => void;
   setCurrentDocumentId: (documentId: string | null) => void;
   setEditorStates: (value: { manuscriptJson: string; leftMarginJson: string; rightMarginJson: string }) => void;
+  setManuscriptJson: (manuscriptJson: string) => void;
+  setLeftMarginJson: (leftMarginJson: string) => void;
+  setRightMarginJson: (rightMarginJson: string) => void;
   setPresets: (presets: ExportPresetRecord[]) => void;
   setDefaultPresetId: (presetId: string | null) => void;
   setPagePreview: (pagePreview: boolean) => void;
@@ -83,6 +137,7 @@ interface AppState {
   setRightCurrentBlockId: (blockId: string | null) => void;
   setLeftLinksByManuscriptBlockId: (index: MarginLinkIndex) => void;
   setRightLinksByManuscriptBlockId: (index: MarginLinkIndex) => void;
+  setEditorialUnitProjection: (projection: EditorialUnitProjection) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -107,6 +162,7 @@ export const useAppStore = create<AppState>((set) => ({
   rightCurrentBlockId: null,
   leftLinksByManuscriptBlockId: {},
   rightLinksByManuscriptBlockId: {},
+  editorialUnitProjection: EMPTY_EDITORIAL_UNIT_PROJECTION,
   setDb: (db) => set({ db }),
   setPrefsStore: (prefsStore) => set({ prefsStore }),
   setInitialized: (initialized) => set({ initialized }),
@@ -114,6 +170,12 @@ export const useAppStore = create<AppState>((set) => ({
   setCurrentDocumentId: (currentDocumentId) => set({ currentDocumentId }),
   setEditorStates: ({ manuscriptJson, leftMarginJson, rightMarginJson }) =>
     set({ manuscriptJson, leftMarginJson, rightMarginJson }),
+  setManuscriptJson: (manuscriptJson) =>
+    set((state) => (state.manuscriptJson === manuscriptJson ? state : { manuscriptJson })),
+  setLeftMarginJson: (leftMarginJson) =>
+    set((state) => (state.leftMarginJson === leftMarginJson ? state : { leftMarginJson })),
+  setRightMarginJson: (rightMarginJson) =>
+    set((state) => (state.rightMarginJson === rightMarginJson ? state : { rightMarginJson })),
   setPresets: (presets) => set({ presets }),
   setDefaultPresetId: (defaultPresetId) => set({ defaultPresetId }),
   setPagePreview: (pagePreview) => set({ pagePreview }),
@@ -141,5 +203,11 @@ export const useAppStore = create<AppState>((set) => ({
       marginLinkIndexEquals(state.rightLinksByManuscriptBlockId, rightLinksByManuscriptBlockId)
         ? state
         : { rightLinksByManuscriptBlockId }
+    ),
+  setEditorialUnitProjection: (editorialUnitProjection) =>
+    set((state) =>
+      editorialUnitProjectionEquals(state.editorialUnitProjection, editorialUnitProjection)
+        ? state
+        : { editorialUnitProjection }
     ),
 }));

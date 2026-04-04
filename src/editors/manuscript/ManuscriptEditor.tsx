@@ -327,7 +327,7 @@ function ManuscriptToolbar(props: {
             type="button"
             onClick={() => props.onCreateLinkedMarginalia(currentManuscriptBlockId)}
           >
-            New Linked Pair
+            Add Scholie
           </button>
           <button
             className="toolbar-button toolbar-button-compact"
@@ -335,7 +335,7 @@ function ManuscriptToolbar(props: {
             disabled={!currentManuscriptBlockId}
             onClick={() => props.onRevealMarginalia(currentManuscriptBlockId)}
           >
-            Show Notes
+            Reveal Scholies
           </button>
         </div>
         <details className="editor-advanced-tools">
@@ -424,13 +424,13 @@ function ManuscriptToolbar(props: {
           {currentManuscriptBlockId ? `Passage ${currentManuscriptBlockId.slice(0, 8)}` : "Select or create a passage"}
         </span>
         {currentManuscriptBlockId ? (
-          <span className="margin-status-chip">Notes: L{linkedLeftCount} R{linkedRightCount}</span>
+          <span className="margin-status-chip">Scholies {linkedLeftCount} / Sources {linkedRightCount}</span>
         ) : null}
         <details className="context-help">
           <summary>Help</summary>
           <div className="context-help-body">
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N create linked pair</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G show linked notes</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+N add scholie for passage</span>
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G reveal scholies</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+1/2/3 apply heading</span>
             <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+0 return to paragraph</span>
           </div>
@@ -587,7 +587,7 @@ export const ManuscriptEditor = forwardRef<ManuscriptEditorHandle, ManuscriptEdi
                   <div className="lexical-placeholder manuscript-placeholder">
                     <span className="manuscript-placeholder-title">Begin the manuscript.</span>
                     <span className="manuscript-placeholder-copy">
-                      Draft a passage here, then create linked pairs so each manuscript zone has its aligned margin note.
+                      Draft a passage here, then attach a scholie when a block needs commentary.
                     </span>
                   </div>
                 }

@@ -5,6 +5,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { ThreePaneLayout } from "./layout/ThreePaneLayout";
 import { buildMenu } from "./menu/buildMenu";
 import { CommandPalette, type CommandPaletteItem } from "./CommandPalette";
+import { deriveEditorialUnitProjection } from "../document/editorialUnits";
 import {
   createDocument,
   deleteDocument,
@@ -82,12 +83,16 @@ export default function App() {
     currentManuscriptBlockId,
     leftCurrentBlockId,
     rightCurrentBlockId,
+    leftLinksByManuscriptBlockId,
     setDb,
     setPrefsStore,
     setInitialized,
     setDocuments,
     setCurrentDocumentId,
     setEditorStates,
+    setManuscriptJson,
+    setLeftMarginJson,
+    setRightMarginJson,
     setPresets,
     setDefaultPresetId,
     setPagePreview,
@@ -101,6 +106,7 @@ export default function App() {
     setRightCurrentBlockId,
     setLeftLinksByManuscriptBlockId,
     setRightLinksByManuscriptBlockId,
+    setEditorialUnitProjection,
   } = useAppStore();
 
   const menuRef = useRef<Menu | null>(null);
@@ -353,6 +359,20 @@ export default function App() {
     [manuscriptJson],
   );
 
+  const editorialUnitProjection = useMemo(
+    () =>
+      deriveEditorialUnitProjection({
+        manuscriptJson,
+        leftMarginJson,
+        leftLinksByManuscriptBlockId,
+      }),
+    [leftLinksByManuscriptBlockId, leftMarginJson, manuscriptJson],
+  );
+
+  useEffect(() => {
+    setEditorialUnitProjection(editorialUnitProjection);
+  }, [editorialUnitProjection, setEditorialUnitProjection]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const isMainModifier = event.metaKey || event.ctrlKey;
@@ -466,11 +486,12 @@ export default function App() {
       }
       try {
         await saveManuscriptState(db, currentDocumentId, lexicalJson);
+        setManuscriptJson(lexicalJson);
       } catch (error) {
         reportError("The manuscript could not be saved.", error);
       }
     },
-    [currentDocumentId, db, reportError],
+    [currentDocumentId, db, reportError, setManuscriptJson],
   );
 
   const saveLeftMargin = useCallback(
@@ -480,11 +501,12 @@ export default function App() {
       }
       try {
         await saveLeftMarginState(db, currentDocumentId, lexicalJson);
+        setLeftMarginJson(lexicalJson);
       } catch (error) {
         reportError("The left notes could not be saved.", error);
       }
     },
-    [currentDocumentId, db, reportError],
+    [currentDocumentId, db, reportError, setLeftMarginJson],
   );
 
   const saveRightMargin = useCallback(
@@ -494,11 +516,12 @@ export default function App() {
       }
       try {
         await saveRightMarginState(db, currentDocumentId, lexicalJson);
+        setRightMarginJson(lexicalJson);
       } catch (error) {
         reportError("The right notes could not be saved.", error);
       }
     },
-    [currentDocumentId, db, reportError],
+    [currentDocumentId, db, reportError, setRightMarginJson],
   );
 
   const handleSetPaneSizes = useCallback(
@@ -731,9 +754,9 @@ export default function App() {
       },
       {
         id: "view.toggle-right-pane",
-        title: rightPaneVisible ? "Hide right notes" : "Show right notes",
+        title: rightPaneVisible ? "Hide sources" : "Show sources",
         section: "View",
-        keywords: ["pane notes citations"],
+        keywords: ["pane sources citations"],
         onSelect: handleToggleRightPane,
       },
       {
@@ -745,14 +768,14 @@ export default function App() {
       },
       {
         id: "focus.left",
-        title: "Jump to left notes",
+        title: "Jump to scholies",
         section: "Focus",
-        keywords: ["marginalia notes"],
+        keywords: ["scholies commentary gloss"],
         onSelect: () => leftEditorRef.current?.focusEditor(),
       },
       {
         id: "focus.right",
-        title: "Jump to right notes",
+        title: "Jump to sources",
         section: "Focus",
         disabled: !rightPaneVisible,
         keywords: ["citations notes"],
@@ -760,17 +783,17 @@ export default function App() {
       },
       {
         id: "left.new-linked",
-        title: "Left notes: create linked pair",
-        section: "Left Notes",
+        title: "Scholies: add for current passage",
+        section: "Scholies",
         disabled: false,
         shortcut: "Ctrl/Cmd+Alt+N",
-        keywords: ["note anchor manuscript"],
+        keywords: ["scholie passage commentary anchor manuscript"],
         onSelect: () => handleCreateLinkedMarginalia(currentManuscriptBlockId),
       },
       {
         id: "left.duplicate",
-        title: "Left notes: duplicate current note",
-        section: "Left Notes",
+        title: "Scholies: duplicate current scholie",
+        section: "Scholies",
         disabled: !leftCurrentBlockId,
         shortcut: "Ctrl/Cmd+Alt+D",
         keywords: ["copy clone"],
@@ -778,8 +801,8 @@ export default function App() {
       },
       {
         id: "left.split",
-        title: "Left notes: split current note",
-        section: "Left Notes",
+        title: "Scholies: split current scholie",
+        section: "Scholies",
         disabled: !leftCurrentBlockId,
         shortcut: "Ctrl/Cmd+Alt+S",
         keywords: ["break divide"],
@@ -787,8 +810,8 @@ export default function App() {
       },
       {
         id: "left.merge-up",
-        title: "Left notes: merge current note upward",
-        section: "Left Notes",
+        title: "Scholies: merge current scholie upward",
+        section: "Scholies",
         disabled: !leftCurrentBlockId,
         shortcut: "Ctrl/Cmd+Alt+Shift+Up",
         keywords: ["join combine previous"],
@@ -796,8 +819,8 @@ export default function App() {
       },
       {
         id: "left.merge-down",
-        title: "Left notes: merge current note downward",
-        section: "Left Notes",
+        title: "Scholies: merge current scholie downward",
+        section: "Scholies",
         disabled: !leftCurrentBlockId,
         shortcut: "Ctrl/Cmd+Alt+Shift+Down",
         keywords: ["join combine next"],
@@ -805,8 +828,8 @@ export default function App() {
       },
       {
         id: "left.delete",
-        title: "Left notes: delete current note",
-        section: "Left Notes",
+        title: "Scholies: delete current scholie",
+        section: "Scholies",
         disabled: !leftCurrentBlockId,
         shortcut: "Ctrl/Cmd+Alt+X",
         keywords: ["remove trash"],

@@ -216,8 +216,11 @@ test("createDocument seeds built-in presets, default editor states, and export s
   const bundle = await getDocumentStateBundle(asDatabase(fakeDb), created.id);
   assert.equal(bundle.defaultPresetId, BUILTIN_PRESETS[0].id);
   assert.match(bundle.manuscriptJson, /Start writing your manuscript here\./);
-  assert.match(bundle.leftMarginJson, /Working notes and ideas\./);
-  assert.match(bundle.rightMarginJson, /Sources and citations\./);
+  assert.deepEqual(
+    (JSON.parse(bundle.leftMarginJson) as { root: { children: unknown[] } }).root.children,
+    [],
+  );
+  assert.match(bundle.rightMarginJson, /Sources, citations, and annexes\./);
 });
 
 test("getDocumentStateBundle keeps only manuscript block ids still referenced by linked margin notes", async () => {

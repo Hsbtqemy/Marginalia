@@ -90,17 +90,17 @@ function defaultManuscriptState(): string {
   return JSON.stringify(
     createRoot([
       createParagraphNode("Start writing your manuscript here."),
-      createParagraphNode("Use Cmd/Ctrl+Alt+N to push context into marginalia."),
+      createParagraphNode("Use Cmd/Ctrl+Alt+N to add a scholie for the current passage."),
     ]),
   );
 }
 
 function defaultLeftMarginState(): string {
-  return JSON.stringify(createRoot([createMarginaliaBlockNode("left", "Working notes and ideas.")]));
+  return JSON.stringify(createRoot([]));
 }
 
 function defaultRightMarginState(): string {
-  return JSON.stringify(createRoot([createMarginaliaBlockNode("right", "Sources and citations.")]));
+  return JSON.stringify(createRoot([createMarginaliaBlockNode("right", "Sources, citations, and annexes.")]));
 }
 
 function dbRowToDocument(row: {

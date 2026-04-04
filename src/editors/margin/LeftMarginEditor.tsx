@@ -20,8 +20,8 @@ export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEdi
       <MarginEditorBase
         ref={ref}
         kind="left"
-        title="Marginalia"
-        subtitle="Working notes, reflections, and linked passages."
+        title="Scholies"
+        subtitle="Commentary aligned to manuscript blocks."
         initialStateJson={props.initialStateJson}
         manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
         onAutosave={props.onAutosave}

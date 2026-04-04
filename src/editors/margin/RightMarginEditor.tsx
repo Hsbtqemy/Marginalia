@@ -19,8 +19,8 @@ export const RightMarginEditor = forwardRef<RightMarginEditorHandle, RightMargin
       <MarginEditorBase
         ref={ref}
         kind="right"
-        title="Sources & Notes"
-        subtitle="Citations, references, and supporting notes."
+        title="Sources"
+        subtitle="Citations, references, and annexes."
         initialStateJson={props.initialStateJson}
         manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
         onAutosave={props.onAutosave}
