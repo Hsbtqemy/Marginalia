@@ -6,8 +6,8 @@ use std::{
 
 use docx_rs::{
     AbstractNumbering, BreakType, Comment, Document, Docx, Footnote, IndentLevel, Level, LevelJc,
-    LevelText, LineSpacing, LineSpacingType, NumberFormat, Numbering, NumberingId, PageMargin,
-    PageSize, Paragraph, Run, RunFonts, SectionProperty, SpecialIndentType, Start,
+    LevelOverride, LevelText, LineSpacing, LineSpacingType, NumberFormat, Numbering, NumberingId,
+    PageMargin, PageSize, Paragraph, Run, RunFonts, SectionProperty, SpecialIndentType, Start,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -46,11 +46,78 @@ struct ExportDocxPayload {
     output_path: String,
     document_title: String,
     profile: String,
-    manuscript_json: String,
-    margin_left_json: String,
-    margin_right_json: String,
+    editorial_export_json: String,
     preset: ExportPresetPayload,
-    include_unlinked_left_annex: bool,
+    include_supplemental_left_annex: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorialExportRulesPayload {
+    scholie_role: String,
+    right_note_role: String,
+    supplemental_left_role: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorialExportTextSegmentPayload {
+    text: String,
+    bold: bool,
+    italic: bool,
+    underline: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorialExportManuscriptBlockPayload {
+    block_id: String,
+    kind: String,
+    heading_level: Option<u8>,
+    ordered_list: bool,
+    list_group_id: Option<String>,
+    list_start: Option<usize>,
+    text: String,
+    segments: Vec<EditorialExportTextSegmentPayload>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorialExportNotePayload {
+    margin_block_id: String,
+    linked_manuscript_block_id: Option<String>,
+    text: String,
+    segments: Vec<EditorialExportTextSegmentPayload>,
+    has_content: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorialExportSupplementalLeftNotePayload {
+    margin_block_id: String,
+    linked_manuscript_block_id: Option<String>,
+    text: String,
+    segments: Vec<EditorialExportTextSegmentPayload>,
+    has_content: bool,
+    reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorialExportUnitPayload {
+    unit_id: String,
+    manuscript: EditorialExportManuscriptBlockPayload,
+    scholie: Option<EditorialExportNotePayload>,
+    right_notes: Vec<EditorialExportNotePayload>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorialExportDocumentPayload {
+    profile: String,
+    rules: EditorialExportRulesPayload,
+    units: Vec<EditorialExportUnitPayload>,
+    supplemental_left_notes: Vec<EditorialExportSupplementalLeftNotePayload>,
 }
 
 #[derive(Debug, Clone)]
@@ -119,13 +186,9 @@ fn pick_save_path(
 
 #[tauri::command]
 fn export_docx(payload: ExportDocxPayload) -> Result<String, String> {
-    let manuscript_value = parse_json(&payload.manuscript_json)?;
-    let margin_left_value = parse_json(&payload.margin_left_json)?;
-    let margin_right_value = parse_json(&payload.margin_right_json)?;
-
-    let manuscript_blocks = parse_manuscript_blocks(&manuscript_value);
-    let left_margin_blocks = parse_margin_blocks(&margin_left_value);
-    let right_margin_blocks = parse_margin_blocks(&margin_right_value);
+    let export_document: EditorialExportDocumentPayload =
+        serde_json::from_str(&payload.editorial_export_json)
+            .map_err(|error| format!("Invalid editorial export JSON: {error}"))?;
 
     let section_property = section_property_from_preset(&payload.preset);
     let mut docx = Docx::new()
@@ -138,118 +201,180 @@ fn export_docx(payload: ExportDocxPayload) -> Result<String, String> {
             ORDERED_LIST_NUM_ID,
             ORDERED_LIST_ABSTRACT_NUM_ID,
         ))
-        .add_abstract_numbering(bullet_list_definition())
+        .add_abstract_numbering(clean_bullet_list_definition())
         .add_numbering(Numbering::new(
             BULLET_LIST_NUM_ID,
             BULLET_LIST_ABSTRACT_NUM_ID,
         ));
 
-    let is_working_profile = payload.profile.eq_ignore_ascii_case("working");
-    let (linked_left_by_block, unlinked_left) = group_margin_blocks(left_margin_blocks);
-    let (linked_right_by_block, _) = group_margin_blocks(right_margin_blocks);
+    let is_working_profile = export_document.profile.eq_ignore_ascii_case("working")
+        || payload.profile.eq_ignore_ascii_case("working");
+    let use_scholie_comments = export_document
+        .rules
+        .scholie_role
+        .eq_ignore_ascii_case("comment");
+    let use_right_footnotes = export_document
+        .rules
+        .right_note_role
+        .eq_ignore_ascii_case("footnote");
+    let include_supplemental_left_annex = payload.include_supplemental_left_annex
+        && export_document
+            .rules
+            .supplemental_left_role
+            .eq_ignore_ascii_case("annex");
 
     let mut next_comment_id: usize = 1;
+    let mut ordered_list_numberings: HashMap<String, usize> = HashMap::new();
+    let mut next_ordered_list_num_id: usize = BULLET_LIST_NUM_ID + 1;
 
-    for block in &manuscript_blocks {
-        let mut paragraph = styled_paragraph_from_block(block, &payload.preset);
+    for unit in &export_document.units {
+        let (ordered_list_numbering_id, numbering_override) = resolve_ordered_list_numbering(
+            &unit.manuscript,
+            &mut ordered_list_numberings,
+            &mut next_ordered_list_num_id,
+        );
+        if let Some(numbering) = numbering_override {
+            docx = docx.add_numbering(numbering);
+        }
 
-        if is_working_profile {
-            if let Some(annotations) = linked_left_by_block.get(&block.block_id) {
-                for annotation in annotations {
-                    if annotation.text.trim().is_empty() {
-                        continue;
-                    }
+        let block = manuscript_block_from_export(&unit.manuscript);
+        let mut paragraph =
+            styled_paragraph_from_block(&block, &payload.preset, ordered_list_numbering_id, None);
 
-                    let comment_id = next_comment_id;
-                    next_comment_id += 1;
+        if is_working_profile && use_scholie_comments {
+            if let Some(annotation) = unit
+                .scholie
+                .as_ref()
+                .filter(|note| note.has_content && !note.text.trim().is_empty())
+            {
+                let annotation_block = margin_block_from_export(annotation);
+                let comment_id = next_comment_id;
+                next_comment_id += 1;
 
-                    let comment = Comment::new(comment_id).author("Marginalia").add_paragraph(
-                        add_styled_runs_to_paragraph(
-                            Paragraph::new(),
-                            &annotation.segments,
-                            &payload.preset,
-                            1.0,
-                            false,
-                            false,
-                            false,
-                        ),
-                    );
-
-                    paragraph = paragraph.add_comment_start(comment);
-                    paragraph = paragraph.add_run(run_from_text(
-                        "◊",
+                let comment = Comment::new(comment_id).author("Marginalia").add_paragraph(
+                    add_styled_runs_to_paragraph(
+                        Paragraph::new().line_spacing(base_line_spacing(&payload.preset)),
+                        &annotation_block.segments,
                         &payload.preset,
                         1.0,
                         false,
                         false,
                         false,
-                    ));
-                    paragraph = paragraph.add_comment_end(comment_id);
-                }
+                        None,
+                    ),
+                );
+
+                paragraph = styled_paragraph_from_block(
+                    &block,
+                    &payload.preset,
+                    ordered_list_numbering_id,
+                    Some(comment),
+                );
             }
+        }
 
-            if let Some(footnotes) = linked_right_by_block.get(&block.block_id) {
-                for footnote_block in footnotes {
-                    if footnote_block.text.trim().is_empty() {
-                        continue;
-                    }
-
-                    let footnote = Footnote::new().add_content(add_styled_runs_to_paragraph(
-                        Paragraph::new(),
-                        &footnote_block.segments,
-                        &payload.preset,
-                        1.0,
-                        false,
-                        false,
-                        false,
-                    ));
-                    paragraph = paragraph.add_run(Run::new().add_footnote_reference(footnote));
-                }
+        if is_working_profile && use_right_footnotes {
+            for footnote_note in unit
+                .right_notes
+                .iter()
+                .filter(|note| note.has_content && !note.text.trim().is_empty())
+            {
+                let footnote_block = margin_block_from_export(footnote_note);
+                let footnote = Footnote::new().add_content(add_styled_runs_to_paragraph(
+                    Paragraph::new().line_spacing(base_line_spacing(&payload.preset)),
+                    &footnote_block.segments,
+                    &payload.preset,
+                    1.0,
+                    false,
+                    false,
+                    false,
+                    None,
+                ));
+                paragraph = paragraph.add_run(Run::new().add_footnote_reference(footnote));
             }
         }
 
         docx = docx.add_paragraph(paragraph);
     }
 
-    if is_working_profile && payload.include_unlinked_left_annex && !unlinked_left.is_empty() {
-        let annex_heading = Paragraph::new()
-            .style("Heading1")
-            .line_spacing(base_line_spacing(&payload.preset))
-            .add_run(run_from_text(
-                "Chutier",
-                &payload.preset,
-                payload.preset.heading_scale.h1,
-                true,
-                false,
-                false,
-            ));
-        docx = docx.add_paragraph(annex_heading);
+    if is_working_profile && include_supplemental_left_annex {
+        let supplemental_left_notes: Vec<&EditorialExportSupplementalLeftNotePayload> =
+            export_document
+                .supplemental_left_notes
+                .iter()
+                .filter(|note| note.has_content || !note.text.trim().is_empty())
+                .collect();
 
-        for block in &unlinked_left {
-            let note_text = if block.text.trim().is_empty() {
-                format!("({})", block.margin_block_id)
-            } else {
-                block.text.clone()
-            };
-            let paragraph = Paragraph::new()
+        if !supplemental_left_notes.is_empty() {
+            let annex_heading = Paragraph::new()
+                .style("Heading1")
                 .line_spacing(base_line_spacing(&payload.preset))
                 .add_run(run_from_text(
-                    &format!("• {note_text}"),
+                    "Supplemental Scholies",
+                    &payload.preset,
+                    payload.preset.heading_scale.h1,
+                    true,
+                    false,
+                    false,
+                ));
+            docx = docx.add_paragraph(annex_heading);
+
+            for note in supplemental_left_notes {
+                let block = supplemental_left_margin_block_from_export(note);
+                let mut paragraph =
+                    Paragraph::new().line_spacing(base_line_spacing(&payload.preset));
+                paragraph = paragraph.add_run(run_from_text(
+                    "\u{2022} ",
                     &payload.preset,
                     1.0,
                     false,
                     false,
                     false,
                 ));
-            docx = docx.add_paragraph(paragraph);
+                paragraph = paragraph.add_run(run_from_text(
+                    &format!("[{}] ", supplemental_left_reason_label(&note.reason)),
+                    &payload.preset,
+                    1.0,
+                    true,
+                    false,
+                    false,
+                ));
+                if block.segments.is_empty() {
+                    paragraph = paragraph.add_run(run_from_text(
+                        &format!("({})", block.margin_block_id),
+                        &payload.preset,
+                        1.0,
+                        false,
+                        true,
+                        false,
+                    ));
+                } else {
+                    paragraph = add_styled_runs_to_paragraph(
+                        paragraph,
+                        &block.segments,
+                        &payload.preset,
+                        1.0,
+                        false,
+                        false,
+                        false,
+                        None,
+                    );
+                }
+                docx = docx.add_paragraph(paragraph);
+            }
         }
     }
 
-    if manuscript_blocks.is_empty() {
+    if export_document.units.is_empty() {
+        let fallback_text = if payload.document_title.trim().is_empty() {
+            "Untitled Draft"
+        } else {
+            &payload.document_title
+        };
         let fallback = Paragraph::new()
             .line_spacing(base_line_spacing(&payload.preset))
             .add_run(run_from_text(
-                &payload.document_title,
+                fallback_text,
                 &payload.preset,
                 payload.preset.heading_scale.h1,
                 true,
@@ -393,6 +518,98 @@ fn normalize_text(text: String) -> String {
         .filter(|line| !line.is_empty())
         .collect::<Vec<&str>>()
         .join("\n")
+}
+
+fn styled_segments_from_export(
+    segments: &[EditorialExportTextSegmentPayload],
+) -> Vec<StyledTextSegment> {
+    normalize_segments(
+        segments
+            .iter()
+            .filter(|segment| !segment.text.is_empty())
+            .map(|segment| StyledTextSegment {
+                text: segment.text.clone(),
+                bold: segment.bold,
+                italic: segment.italic,
+                underline: segment.underline,
+            })
+            .collect(),
+    )
+}
+
+fn manuscript_block_from_export(block: &EditorialExportManuscriptBlockPayload) -> ManuscriptBlock {
+    let kind = match block.kind.as_str() {
+        "heading" => ManuscriptKind::Heading(block.heading_level.unwrap_or(1)),
+        "quote" => ManuscriptKind::Quote,
+        "list-item" => ManuscriptKind::ListItem {
+            ordered: block.ordered_list,
+            index: 1,
+        },
+        _ => ManuscriptKind::Paragraph,
+    };
+
+    ManuscriptBlock {
+        block_id: block.block_id.clone(),
+        kind,
+        text: block.text.clone(),
+        segments: styled_segments_from_export(&block.segments),
+    }
+}
+
+fn resolve_ordered_list_numbering(
+    block: &EditorialExportManuscriptBlockPayload,
+    ordered_list_numberings: &mut HashMap<String, usize>,
+    next_ordered_list_num_id: &mut usize,
+) -> (Option<usize>, Option<Numbering>) {
+    if block.kind != "list-item" || !block.ordered_list {
+        return (None, None);
+    }
+
+    let Some(list_group_id) = block.list_group_id.as_ref() else {
+        return (Some(ORDERED_LIST_NUM_ID), None);
+    };
+
+    if let Some(numbering_id) = ordered_list_numberings.get(list_group_id) {
+        return (Some(*numbering_id), None);
+    }
+
+    let numbering_id = *next_ordered_list_num_id;
+    *next_ordered_list_num_id += 1;
+    ordered_list_numberings.insert(list_group_id.clone(), numbering_id);
+
+    let numbering = Numbering::new(numbering_id, ORDERED_LIST_ABSTRACT_NUM_ID)
+        .add_override(LevelOverride::new(0).start(block.list_start.unwrap_or(1).max(1)));
+
+    (Some(numbering_id), Some(numbering))
+}
+
+fn margin_block_from_export(note: &EditorialExportNotePayload) -> MarginBlock {
+    MarginBlock {
+        margin_block_id: note.margin_block_id.clone(),
+        linked_manuscript_block_id: note.linked_manuscript_block_id.clone(),
+        text: note.text.clone(),
+        segments: styled_segments_from_export(&note.segments),
+    }
+}
+
+fn supplemental_left_margin_block_from_export(
+    note: &EditorialExportSupplementalLeftNotePayload,
+) -> MarginBlock {
+    MarginBlock {
+        margin_block_id: note.margin_block_id.clone(),
+        linked_manuscript_block_id: note.linked_manuscript_block_id.clone(),
+        text: note.text.clone(),
+        segments: styled_segments_from_export(&note.segments),
+    }
+}
+
+fn supplemental_left_reason_label(reason: &str) -> &'static str {
+    match reason {
+        "duplicate-left-link" => "Legacy duplicate",
+        "stale-left-link" => "Stale link",
+        "unlinked-left-note" => "Free scholie",
+        _ => "Supplemental scholie",
+    }
 }
 
 fn root_children<'a>(json: &'a Value) -> &'a [Value] {
@@ -612,6 +829,7 @@ fn ordered_list_definition() -> AbstractNumbering {
     )
 }
 
+#[allow(dead_code)]
 fn bullet_list_definition() -> AbstractNumbering {
     AbstractNumbering::new(BULLET_LIST_ABSTRACT_NUM_ID).add_level(
         Level::new(
@@ -619,6 +837,19 @@ fn bullet_list_definition() -> AbstractNumbering {
             Start::new(1),
             NumberFormat::new("bullet"),
             LevelText::new("•"),
+            LevelJc::new("left"),
+        )
+        .indent(Some(720), Some(SpecialIndentType::Hanging(360)), None, None),
+    )
+}
+
+fn clean_bullet_list_definition() -> AbstractNumbering {
+    AbstractNumbering::new(BULLET_LIST_ABSTRACT_NUM_ID).add_level(
+        Level::new(
+            0,
+            Start::new(1),
+            NumberFormat::new("bullet"),
+            LevelText::new("\u{2022}"),
             LevelJc::new("left"),
         )
         .indent(Some(720), Some(SpecialIndentType::Hanging(360)), None, None),
@@ -659,12 +890,19 @@ fn add_styled_runs_to_paragraph(
     default_bold: bool,
     default_italic: bool,
     default_underline: bool,
+    comment_anchor: Option<Comment>,
 ) -> Paragraph {
+    let mut pending_comment = comment_anchor;
+    let mut pending_comment_id = pending_comment.as_ref().map(Comment::id);
+
     for segment in segments {
         let parts: Vec<&str> = segment.text.split('\n').collect();
 
         for (index, part) in parts.iter().enumerate() {
             if !part.is_empty() {
+                if let Some(comment) = pending_comment.take() {
+                    paragraph = paragraph.add_comment_start(comment);
+                }
                 paragraph = paragraph.add_run(run_from_text(
                     part,
                     preset,
@@ -673,11 +911,29 @@ fn add_styled_runs_to_paragraph(
                     default_italic || segment.italic,
                     default_underline || segment.underline,
                 ));
+                if let Some(comment_id) = pending_comment_id.take() {
+                    paragraph = paragraph.add_comment_end(comment_id);
+                }
             }
 
             if index + 1 < parts.len() {
                 paragraph = paragraph.add_run(Run::new().add_break(BreakType::TextWrapping));
             }
+        }
+    }
+
+    if let Some(comment) = pending_comment.take() {
+        paragraph = paragraph.add_comment_start(comment);
+        paragraph = paragraph.add_run(run_from_text(
+            "\u{2060}",
+            preset,
+            scale,
+            default_bold,
+            default_italic,
+            default_underline,
+        ));
+        if let Some(comment_id) = pending_comment_id.take() {
+            paragraph = paragraph.add_comment_end(comment_id);
         }
     }
 
@@ -959,9 +1215,178 @@ mod tests {
         let normalized = normalize_text("  First \n\n  Second  \n   \nThird ".into());
         assert_eq!(normalized, "First\nSecond\nThird");
     }
+
+    #[test]
+    fn styled_segments_from_export_preserves_inline_styles_and_linebreaks() {
+        let segments = styled_segments_from_export(&[
+            EditorialExportTextSegmentPayload {
+                text: "Bold".into(),
+                bold: true,
+                italic: false,
+                underline: false,
+            },
+            EditorialExportTextSegmentPayload {
+                text: "\nplain".into(),
+                bold: false,
+                italic: false,
+                underline: false,
+            },
+            EditorialExportTextSegmentPayload {
+                text: " under".into(),
+                bold: false,
+                italic: false,
+                underline: true,
+            },
+        ]);
+
+        assert_eq!(
+            segments,
+            vec![
+                StyledTextSegment {
+                    text: "Bold".into(),
+                    bold: true,
+                    italic: false,
+                    underline: false,
+                },
+                StyledTextSegment {
+                    text: "\nplain".into(),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                },
+                StyledTextSegment {
+                    text: " under".into(),
+                    bold: false,
+                    italic: false,
+                    underline: true,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn supplemental_left_margin_block_from_export_keeps_styled_segments() {
+        let block = supplemental_left_margin_block_from_export(
+            &EditorialExportSupplementalLeftNotePayload {
+                margin_block_id: "left-1".into(),
+                linked_manuscript_block_id: None,
+                text: "Free scholie".into(),
+                segments: vec![
+                    EditorialExportTextSegmentPayload {
+                        text: "Free".into(),
+                        bold: true,
+                        italic: false,
+                        underline: false,
+                    },
+                    EditorialExportTextSegmentPayload {
+                        text: "\nsholie".into(),
+                        bold: false,
+                        italic: true,
+                        underline: false,
+                    },
+                ],
+                has_content: true,
+                reason: "unlinked-left-note".into(),
+            },
+        );
+
+        assert_eq!(block.margin_block_id, "left-1");
+        assert_eq!(block.text, "Free scholie");
+        assert_eq!(
+            block.segments,
+            vec![
+                StyledTextSegment {
+                    text: "Free".into(),
+                    bold: true,
+                    italic: false,
+                    underline: false,
+                },
+                StyledTextSegment {
+                    text: "\nsholie".into(),
+                    bold: false,
+                    italic: true,
+                    underline: false,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn resolve_ordered_list_numbering_reuses_group_ids_and_preserves_start() {
+        let mut ordered_list_numberings = HashMap::new();
+        let mut next_ordered_list_num_id = BULLET_LIST_NUM_ID + 1;
+
+        let first_block = EditorialExportManuscriptBlockPayload {
+            block_id: "list-a-1".into(),
+            kind: "list-item".into(),
+            heading_level: None,
+            ordered_list: true,
+            list_group_id: Some("list-a-1".into()),
+            list_start: Some(3),
+            text: "Third item".into(),
+            segments: vec![],
+        };
+        let second_block = EditorialExportManuscriptBlockPayload {
+            block_id: "list-a-2".into(),
+            kind: "list-item".into(),
+            heading_level: None,
+            ordered_list: true,
+            list_group_id: Some("list-a-1".into()),
+            list_start: Some(3),
+            text: "Fourth item".into(),
+            segments: vec![],
+        };
+        let third_block = EditorialExportManuscriptBlockPayload {
+            block_id: "list-b-1".into(),
+            kind: "list-item".into(),
+            heading_level: None,
+            ordered_list: true,
+            list_group_id: Some("list-b-1".into()),
+            list_start: Some(1),
+            text: "Fresh first item".into(),
+            segments: vec![],
+        };
+
+        let (first_numbering_id, first_override) = resolve_ordered_list_numbering(
+            &first_block,
+            &mut ordered_list_numberings,
+            &mut next_ordered_list_num_id,
+        );
+        let (second_numbering_id, second_override) = resolve_ordered_list_numbering(
+            &second_block,
+            &mut ordered_list_numberings,
+            &mut next_ordered_list_num_id,
+        );
+        let (third_numbering_id, third_override) = resolve_ordered_list_numbering(
+            &third_block,
+            &mut ordered_list_numberings,
+            &mut next_ordered_list_num_id,
+        );
+
+        assert_eq!(first_numbering_id, Some(BULLET_LIST_NUM_ID + 1));
+        assert_eq!(second_numbering_id, first_numbering_id);
+        assert_eq!(third_numbering_id, Some(BULLET_LIST_NUM_ID + 2));
+        assert!(second_override.is_none());
+
+        let first_override = first_override.expect("first group should register an override");
+        let third_override = third_override.expect("second group should register an override");
+        assert_eq!(
+            first_override.level_overrides,
+            vec![LevelOverride::new(0).start(3)]
+        );
+        assert_eq!(
+            third_override.level_overrides,
+            vec![LevelOverride::new(0).start(1)]
+        );
+    }
 }
 
-fn styled_paragraph_from_block(block: &ManuscriptBlock, preset: &ExportPresetPayload) -> Paragraph {
+fn styled_paragraph_from_block(
+    block: &ManuscriptBlock,
+    preset: &ExportPresetPayload,
+    ordered_list_numbering_id: Option<usize>,
+    comment_anchor: Option<Comment>,
+) -> Paragraph {
     let mut paragraph = Paragraph::new().line_spacing(base_line_spacing(preset));
 
     match block.kind {
@@ -973,6 +1398,7 @@ fn styled_paragraph_from_block(block: &ManuscriptBlock, preset: &ExportPresetPay
             false,
             false,
             false,
+            comment_anchor,
         ),
         ManuscriptKind::Heading(level) => {
             let (style, scale) = match level {
@@ -989,6 +1415,7 @@ fn styled_paragraph_from_block(block: &ManuscriptBlock, preset: &ExportPresetPay
                 true,
                 false,
                 false,
+                comment_anchor,
             )
         }
         ManuscriptKind::Quote => {
@@ -1001,11 +1428,15 @@ fn styled_paragraph_from_block(block: &ManuscriptBlock, preset: &ExportPresetPay
                 false,
                 true,
                 false,
+                comment_anchor,
             )
         }
         ManuscriptKind::ListItem { ordered, index: _ } => {
             paragraph = if ordered {
-                paragraph.numbering(NumberingId::new(ORDERED_LIST_NUM_ID), IndentLevel::new(0))
+                paragraph.numbering(
+                    NumberingId::new(ordered_list_numbering_id.unwrap_or(ORDERED_LIST_NUM_ID)),
+                    IndentLevel::new(0),
+                )
             } else {
                 paragraph.numbering(NumberingId::new(BULLET_LIST_NUM_ID), IndentLevel::new(0))
             };
@@ -1017,6 +1448,7 @@ fn styled_paragraph_from_block(block: &ManuscriptBlock, preset: &ExportPresetPay
                 false,
                 false,
                 false,
+                comment_anchor,
             )
         }
     }

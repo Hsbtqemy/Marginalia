@@ -10,6 +10,7 @@ export interface MenuHandlers {
   onExportPdf: () => void;
   onTogglePagePreview: () => void;
   onToggleRightPane: () => void;
+  onTogglePointerBlockDrag: () => void;
   onSetTheme: (mode: ThemeMode) => void;
   onToggleHighContrast: () => void;
   onOpenPresetManager: () => void;
@@ -18,6 +19,7 @@ export interface MenuHandlers {
 export interface MenuState {
   pagePreview: boolean;
   rightPaneVisible: boolean;
+  pointerBlockDragEnabled: boolean;
   themeMode: ThemeMode;
   highContrast: boolean;
 }
@@ -118,6 +120,12 @@ export async function buildMenu(state: MenuState, handlers: MenuHandlers): Promi
         text: "Show Right Notes",
         checked: state.rightPaneVisible,
         action: () => handlers.onToggleRightPane(),
+      }),
+      await CheckMenuItem.new({
+        id: "view.toggle_pointer_drag",
+        text: "Enable Pointer Drag Reorder",
+        checked: state.pointerBlockDragEnabled,
+        action: () => handlers.onTogglePointerBlockDrag(),
       }),
       await PredefinedMenuItem.new({ item: "Separator" }),
       themeMenu,

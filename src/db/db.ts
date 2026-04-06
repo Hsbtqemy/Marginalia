@@ -1,5 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 import migration001 from "./migrations/001_initial.sql?raw";
+import migration002 from "./migrations/002_document_unit_models.sql?raw";
 import { splitStatements } from "./sqlStatements";
 import { runInTransaction as runDbTransaction } from "./writeUtils";
 
@@ -10,7 +11,10 @@ interface MigrationDef {
   sql: string;
 }
 
-const MIGRATIONS: MigrationDef[] = [{ version: 1, sql: migration001 }];
+const MIGRATIONS: MigrationDef[] = [
+  { version: 1, sql: migration001 },
+  { version: 2, sql: migration002 },
+];
 
 async function runStatements(db: Database, sql: string): Promise<void> {
   const statements = splitStatements(sql);

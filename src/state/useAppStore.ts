@@ -105,6 +105,7 @@ interface AppState {
   defaultPresetId: string | null;
   pagePreview: boolean;
   rightPaneVisible: boolean;
+  pointerBlockDragEnabled: boolean;
   presetManagerOpen: boolean;
   themeMode: ThemeMode;
   highContrast: boolean;
@@ -128,6 +129,7 @@ interface AppState {
   setDefaultPresetId: (presetId: string | null) => void;
   setPagePreview: (pagePreview: boolean) => void;
   setRightPaneVisible: (visible: boolean) => void;
+  setPointerBlockDragEnabled: (enabled: boolean) => void;
   setPresetManagerOpen: (open: boolean) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setHighContrast: (enabled: boolean) => void;
@@ -153,10 +155,11 @@ export const useAppStore = create<AppState>((set) => ({
   defaultPresetId: null,
   pagePreview: false,
   rightPaneVisible: false,
+  pointerBlockDragEnabled: true,
   presetManagerOpen: false,
   themeMode: "system",
   highContrast: false,
-  paneSizes: { left: 0.22, right: 0.18 },
+  paneSizes: { left: 0.18, right: 0.16 },
   currentManuscriptBlockId: null,
   leftCurrentBlockId: null,
   rightCurrentBlockId: null,
@@ -180,6 +183,7 @@ export const useAppStore = create<AppState>((set) => ({
   setDefaultPresetId: (defaultPresetId) => set({ defaultPresetId }),
   setPagePreview: (pagePreview) => set({ pagePreview }),
   setRightPaneVisible: (rightPaneVisible) => set({ rightPaneVisible }),
+  setPointerBlockDragEnabled: (pointerBlockDragEnabled) => set({ pointerBlockDragEnabled }),
   setPresetManagerOpen: (presetManagerOpen) => set({ presetManagerOpen }),
   setThemeMode: (themeMode) => set({ themeMode }),
   setHighContrast: (highContrast) => set({ highContrast }),

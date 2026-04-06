@@ -35,14 +35,10 @@ const MARGINALIA_PREVIEW_SELECTOR = '[data-marginalia-preview="true"]';
 
 function formatBlockMeta(kind: MarginKind, linkedManuscriptBlockId: string | null): string {
   if (kind === "left") {
-    return linkedManuscriptBlockId
-      ? `Scholie on ${linkedManuscriptBlockId.slice(0, 8)}`
-      : "Awaiting passage";
+    return linkedManuscriptBlockId ? "Attached scholie" : "Awaiting unit";
   }
 
-  return linkedManuscriptBlockId
-    ? `Source on ${linkedManuscriptBlockId.slice(0, 8)}`
-    : "Source note";
+  return linkedManuscriptBlockId ? "Attached source" : "Source note";
 }
 
 function createBlockHandle(marginBlockId: string): HTMLButtonElement {
@@ -68,7 +64,7 @@ function createBlockHeader(marginBlockId: string): HTMLDivElement {
   const meta = document.createElement("span");
   meta.className = "marginalia-block-meta";
   meta.dataset.marginaliaMeta = "true";
-  meta.textContent = "Source note";
+  meta.textContent = "Marginalia";
   header.append(createBlockHandle(marginBlockId));
   header.append(meta);
   return header;

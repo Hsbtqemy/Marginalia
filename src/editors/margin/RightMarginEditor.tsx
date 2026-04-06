@@ -10,6 +10,8 @@ interface RightMarginEditorProps {
   onCurrentBlockIdChange: (marginBlockId: string | null) => void;
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
+  pointerBlockDragEnabled: boolean;
+  onDisablePointerBlockDrag?: (message: string) => void;
   onFocusChange?: (focused: boolean) => void;
 }
 
@@ -27,6 +29,8 @@ export const RightMarginEditor = forwardRef<RightMarginEditorHandle, RightMargin
         onCurrentBlockIdChange={props.onCurrentBlockIdChange}
         onLinkIndexChange={props.onLinkIndexChange}
         onNavigateToManuscriptBlock={props.onNavigateToManuscriptBlock}
+        pointerBlockDragEnabled={props.pointerBlockDragEnabled}
+        onDisablePointerBlockDrag={props.onDisablePointerBlockDrag}
         onFocusChange={props.onFocusChange}
       />
     );

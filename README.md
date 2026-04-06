@@ -134,7 +134,21 @@ Profiles:
 - `Working`:
   - linked left blocks -> comments attached to matching manuscript block
   - linked right blocks -> footnotes attached to matching manuscript block
-  - unlinked left blocks -> annex section `Chutier` (enabled by default)
+  - unlinked left blocks -> annex section `Supplemental Scholies` (enabled by default)
+
+Editor -> DOCX matrix:
+
+| Editor source | Clean | Working |
+| --- | --- | --- |
+| manuscript paragraph | paragraph | paragraph |
+| manuscript heading (`h1` / `h2` / `h3`) | heading | heading |
+| manuscript quote | quote paragraph | quote paragraph |
+| manuscript list item | numbered/bulleted list item | numbered/bulleted list item |
+| primary linked left scholie | omitted | Word comment anchored to the manuscript block |
+| linked right note | omitted | Word footnote anchored to the manuscript block |
+| supplemental left scholie | omitted | annex entry with legacy/free-note label |
+| inline bold / italic / underline | preserved on supported manuscript and note runs | preserved on supported manuscript and note runs |
+| line breaks inside a block | preserved as line breaks inside the DOCX paragraph | preserved as line breaks inside the DOCX paragraph |
 
 Preset fields (font, spacing, page size, margins, heading scale) are applied to DOCX output.
 
@@ -142,11 +156,13 @@ Current DOCX guarantees:
 - paragraph, heading, quote, and basic list structure
 - working-profile comments from left marginalia
 - working-profile footnotes from right marginalia
+- working-profile annex for supplemental left scholies
+- inline bold / italic / underline on supported manuscript and note runs
 - preset-driven font, spacing, page size, and margins
 
 Current DOCX limitations:
 - no full-fidelity round-trip of arbitrary Lexical markup
-- limited inline-style preservation
+- no guarantee for complex nested list structures
 - no advanced nested structure rendering guarantees
 - output is semantic/structured first, not strict WYSIWYG
 

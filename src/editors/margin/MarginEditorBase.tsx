@@ -142,6 +142,15 @@ interface MarginEditorBaseProps {
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
   onRequestCreateLinkedNote?: () => void;
+  onMoveLinkedUnitUp?: (marginBlockId: string) => void;
+  onMoveLinkedUnitDown?: (marginBlockId: string) => void;
+  onMoveLinkedUnitToMarginTarget?: (
+    sourceMarginBlockId: string,
+    targetMarginBlockId: string,
+    position: DropPosition,
+  ) => boolean;
+  pointerBlockDragEnabled: boolean;
+  onDisablePointerBlockDrag?: (message: string) => void;
   onFocusChange?: (focused: boolean) => void;
   legacyDuplicateSummary?: {
     affectedUnitCount: number;
@@ -166,6 +175,7 @@ interface MarginUiCopy {
   createStandaloneLabel: string;
   createLinkedLabel: string;
   linkActionLabel: string;
+  navigateActionLabel: string;
   unlinkActionLabel: string;
   duplicateActionLabel: string;
   deleteActionLabel: string;
@@ -173,6 +183,7 @@ interface MarginUiCopy {
   unlinkedStatusLabel: string;
   createShortcutHint: string;
   linkShortcutHint: string;
+  navigateShortcutHint: string;
   duplicateShortcutHint: string;
   splitShortcutHint: string;
   deleteShortcutHint: string;
@@ -191,6 +202,7 @@ interface DragState {
   pointerId: number;
   sourceMarginBlockId: string;
   sourceHandle: HTMLElement;
+  sourceUsesUnitMove: boolean;
   startX: number;
   startY: number;
   hasMoved: boolean;
@@ -204,9 +216,6 @@ interface DragState {
 
 const MARGIN_BLOCK_SELECTOR = "[data-margin-block-id]";
 const MARGINALIA_HANDLE_SELECTOR = '[data-marginalia-handle="true"]';
-// Safety fallback: pointer-drag can lock all clicks if capture is not released by the runtime.
-// Keep keyboard + command based structure operations enabled.
-const ENABLE_POINTER_BLOCK_DRAG = false;
 const DEFAULT_MARGIN_TOOLBAR_STATE: MarginToolbarState = {
   bold: false,
   italic: false,
@@ -223,18 +232,20 @@ function getMarginUiCopy(kind: MarginKind): MarginUiCopy {
       allowStandaloneCreate: false,
       createStandaloneLabel: "New Scholie",
       createLinkedLabel: "Add Scholie",
-      linkActionLabel: "Attach to Passage",
+      linkActionLabel: "Attach to Unit",
+      navigateActionLabel: "Go to Unit",
       unlinkActionLabel: "Detach Scholie",
       duplicateActionLabel: "Duplicate Scholie",
       deleteActionLabel: "Delete Scholie",
       linkedStatusLabel: "Attached scholie",
-      unlinkedStatusLabel: "Awaiting passage",
-      createShortcutHint: "Ctrl/Cmd+Alt+N add scholie for current passage",
+      unlinkedStatusLabel: "Awaiting unit",
+      createShortcutHint: "Ctrl/Cmd+Alt+N add scholie for current unit",
       linkShortcutHint: "Ctrl/Cmd+Alt+L attach current scholie",
+      navigateShortcutHint: "Ctrl/Cmd+Alt+G jump to the attached unit",
       duplicateShortcutHint: "Ctrl/Cmd+Alt+D duplicate scholie",
       splitShortcutHint: "Ctrl/Cmd+Alt+S split scholie",
       deleteShortcutHint: "Ctrl/Cmd+Alt+X delete scholie",
-      placeholder: "Select a passage, then add a scholie.",
+      placeholder: "Choose a unit, then add a scholie.",
       addButtonAriaLabel: "Add scholie",
     };
   }
@@ -245,6 +256,7 @@ function getMarginUiCopy(kind: MarginKind): MarginUiCopy {
     createStandaloneLabel: "New Source Note",
     createLinkedLabel: "Source for Passage",
     linkActionLabel: "Attach to Passage",
+    navigateActionLabel: "Go to Passage",
     unlinkActionLabel: "Detach from Passage",
     duplicateActionLabel: "Duplicate Source Note",
     deleteActionLabel: "Delete Source Note",
@@ -252,6 +264,7 @@ function getMarginUiCopy(kind: MarginKind): MarginUiCopy {
     unlinkedStatusLabel: "Source note",
     createShortcutHint: "Ctrl/Cmd+Alt+N add source note for passage",
     linkShortcutHint: "Ctrl/Cmd+Alt+L attach current source note",
+    navigateShortcutHint: "Ctrl/Cmd+Alt+G jump to passage",
     duplicateShortcutHint: "Ctrl/Cmd+Alt+D duplicate source note",
     splitShortcutHint: "Ctrl/Cmd+Alt+S split source note",
     deleteShortcutHint: "Ctrl/Cmd+Alt+X delete source note",
@@ -322,7 +335,15 @@ function readMarginToolbarState(): MarginToolbarState {
   return nextState;
 }
 
-function syncLinkedPreviews(
+function formatLinkedMeta(kind: MarginKind, linkedManuscriptBlockId: string | undefined): string {
+  if (kind === "left") {
+    return linkedManuscriptBlockId ? "Attached scholie" : "Awaiting unit";
+  }
+
+  return linkedManuscriptBlockId ? "Attached source" : "Source note";
+}
+
+function syncLinkedReferences(
   rootElement: HTMLElement | null,
   manuscriptExcerptByBlockId: Record<string, string>,
 ): void {
@@ -332,7 +353,12 @@ function syncLinkedPreviews(
 
   const blocks = rootElement.querySelectorAll<HTMLElement>("[data-lexical-marginalia-block='true']");
   for (const block of blocks) {
+    const kind = block.dataset.kind === "right" ? "right" : "left";
+    const meta = block.querySelector<HTMLElement>("[data-marginalia-meta='true']");
     const preview = block.querySelector<HTMLElement>("[data-marginalia-preview='true']");
+    if (meta) {
+      meta.textContent = formatLinkedMeta(kind, block.dataset.linkedManuscriptBlockId);
+    }
     if (!preview) {
       continue;
     }
@@ -346,7 +372,10 @@ function syncLinkedPreviews(
 
     preview.hidden = false;
     preview.textContent =
-      manuscriptExcerptByBlockId[linkedManuscriptBlockId] ?? "Linked passage unavailable in the manuscript.";
+      manuscriptExcerptByBlockId[linkedManuscriptBlockId] ??
+      (kind === "left"
+        ? "Linked unit unavailable in the draft."
+        : "Linked passage unavailable in the manuscript.");
   }
 }
 
@@ -392,7 +421,15 @@ function getMarginBlockElements(rootElement: HTMLElement): HTMLElement[] {
   return [...rootElement.querySelectorAll<HTMLElement>(MARGIN_BLOCK_SELECTOR)];
 }
 
-function collectDragCandidates(rootElement: HTMLElement, sourceMarginBlockId: string): DragCandidate[] {
+function isLinkedMarginBlockElement(element: HTMLElement | null | undefined): boolean {
+  return element?.dataset.linked === "true" || Boolean(element?.dataset.linkedManuscriptBlockId);
+}
+
+function collectDragCandidates(
+  rootElement: HTMLElement,
+  sourceMarginBlockId: string,
+  options?: { linkedOnly?: boolean },
+): DragCandidate[] {
   return getMarginBlockElements(rootElement)
     .map((element) => ({
       marginBlockId: element.dataset.marginBlockId ?? "",
@@ -400,7 +437,9 @@ function collectDragCandidates(rootElement: HTMLElement, sourceMarginBlockId: st
     }))
     .filter(
       (candidate) =>
-        candidate.marginBlockId.length > 0 && candidate.marginBlockId !== sourceMarginBlockId,
+        candidate.marginBlockId.length > 0 &&
+        candidate.marginBlockId !== sourceMarginBlockId &&
+        (!options?.linkedOnly || isLinkedMarginBlockElement(candidate.element)),
     );
 }
 
@@ -473,9 +512,10 @@ function MarginBridgePlugin(props: {
   currentManuscriptBlockId: string | null;
   manuscriptExcerptByBlockId: Record<string, string>;
   onGoToLinkedManuscript: () => void;
+  onMoveLinkedUnitUp?: (marginBlockId: string) => void;
+  onMoveLinkedUnitDown?: (marginBlockId: string) => void;
   onToolbarStateChange: (state: MarginToolbarState) => void;
   onRequestCreateLinkedNote?: () => void;
-  onFocusChange?: (focused: boolean) => void;
 }): null {
   const [editor] = useLexicalComposerContext();
   const callbacksRef = useRef({
@@ -484,9 +524,10 @@ function MarginBridgePlugin(props: {
     onCurrentBlockIdChange: props.onCurrentBlockIdChange,
     onBlurSave: props.onBlurSave,
     onGoToLinkedManuscript: props.onGoToLinkedManuscript,
+    onMoveLinkedUnitUp: props.onMoveLinkedUnitUp,
+    onMoveLinkedUnitDown: props.onMoveLinkedUnitDown,
     onToolbarStateChange: props.onToolbarStateChange,
     onRequestCreateLinkedNote: props.onRequestCreateLinkedNote,
-    onFocusChange: props.onFocusChange,
   });
 
   useEffect(() => {
@@ -496,9 +537,10 @@ function MarginBridgePlugin(props: {
       onCurrentBlockIdChange: props.onCurrentBlockIdChange,
       onBlurSave: props.onBlurSave,
       onGoToLinkedManuscript: props.onGoToLinkedManuscript,
+      onMoveLinkedUnitUp: props.onMoveLinkedUnitUp,
+      onMoveLinkedUnitDown: props.onMoveLinkedUnitDown,
       onToolbarStateChange: props.onToolbarStateChange,
       onRequestCreateLinkedNote: props.onRequestCreateLinkedNote,
-      onFocusChange: props.onFocusChange,
     };
   }, [
     props.currentManuscriptBlockId,
@@ -506,9 +548,10 @@ function MarginBridgePlugin(props: {
     props.onCurrentBlockIdChange,
     props.onBlurSave,
     props.onGoToLinkedManuscript,
+    props.onMoveLinkedUnitUp,
+    props.onMoveLinkedUnitDown,
     props.onToolbarStateChange,
     props.onRequestCreateLinkedNote,
-    props.onFocusChange,
   ]);
 
   useEffect(() => {
@@ -532,8 +575,38 @@ function MarginBridgePlugin(props: {
         presentations = collectMarginaliaPresentationSummaries(props.kind, currentMarginBlockId);
       });
       callbacksRef.current.onToolbarStateChange(nextToolbarState);
-      syncLinkedPreviews(editor.getRootElement(), callbacksRef.current.manuscriptExcerptByBlockId);
+      syncLinkedReferences(editor.getRootElement(), callbacksRef.current.manuscriptExcerptByBlockId);
       syncMarginaliaPresentationState(editor.getRootElement(), presentations);
+    };
+
+    const moveLinkedUnit = (direction: "up" | "down"): boolean => {
+      if (props.kind !== "left") {
+        return false;
+      }
+
+      const moveCallback =
+        direction === "up"
+          ? callbacksRef.current.onMoveLinkedUnitUp
+          : callbacksRef.current.onMoveLinkedUnitDown;
+      if (!moveCallback) {
+        return false;
+      }
+
+      let currentLinkedMarginBlockId: string | null = null;
+      editor.getEditorState().read(() => {
+        const currentBlock = $getCurrentMarginaliaBlockNode();
+        if (!currentBlock?.getLinkedManuscriptBlockId()) {
+          return;
+        }
+        currentLinkedMarginBlockId = currentBlock.getMarginBlockId();
+      });
+
+      if (!currentLinkedMarginBlockId) {
+        return false;
+      }
+
+      moveCallback(currentLinkedMarginBlockId);
+      return true;
     };
 
     syncToolbarState();
@@ -616,11 +689,17 @@ function MarginBridgePlugin(props: {
           }
           if (event.key === "ArrowUp") {
             event.preventDefault();
+            if (moveLinkedUnit("up")) {
+              return true;
+            }
             editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND, undefined);
             return true;
           }
           if (event.key === "ArrowDown") {
             event.preventDefault();
+            if (moveLinkedUnit("down")) {
+              return true;
+            }
             editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND, undefined);
             return true;
           }
@@ -634,25 +713,11 @@ function MarginBridgePlugin(props: {
       }),
       editor.registerRootListener((rootElement, prevRootElement) => {
         const onBlur = () => callbacksRef.current.onBlurSave();
-        const onFocusIn = () => callbacksRef.current.onFocusChange?.(true);
-        const onFocusOut = () => {
-          window.setTimeout(() => {
-            const root = editor.getRootElement();
-            const activeElement = document.activeElement;
-            callbacksRef.current.onFocusChange?.(
-              Boolean(root && activeElement instanceof Node && root.contains(activeElement))
-            );
-          }, 0);
-        };
         if (prevRootElement) {
           prevRootElement.removeEventListener("blur", onBlur, true);
-          prevRootElement.removeEventListener("focusin", onFocusIn);
-          prevRootElement.removeEventListener("focusout", onFocusOut);
         }
         if (rootElement) {
           rootElement.addEventListener("blur", onBlur, true);
-          rootElement.addEventListener("focusin", onFocusIn);
-          rootElement.addEventListener("focusout", onFocusOut);
         }
       }),
     );
@@ -661,13 +726,28 @@ function MarginBridgePlugin(props: {
   return null;
 }
 
-function MarginDragAndDropPlugin(): null {
+function MarginDragAndDropPlugin(props: {
+  kind: MarginKind;
+  onMoveLinkedUnitUp?: (marginBlockId: string) => void;
+  onMoveLinkedUnitDown?: (marginBlockId: string) => void;
+  onMoveLinkedUnitToMarginTarget?: (
+    sourceMarginBlockId: string,
+    targetMarginBlockId: string,
+    position: DropPosition,
+  ) => boolean;
+  onDisablePointerBlockDrag?: (message: string) => void;
+}): null {
   const [editor] = useLexicalComposerContext();
   const pointerDragRef = useRef<DragState | null>(null);
   const keyboardGrabbedBlockIdRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    const disablePointerDrag = (message: string, error?: unknown) => {
+      console.warn(message, error);
+      props.onDisablePointerBlockDrag?.(message);
+    };
+
     const clearVisualState = () => {
       const rootElement = rootRef.current;
       if (!rootElement) {
@@ -683,7 +763,16 @@ function MarginDragAndDropPlugin(): null {
       sourceMarginBlockId: string,
       targetMarginBlockId: string,
       position: DropPosition,
+      useUnitMove: boolean,
     ): boolean => {
+      if (useUnitMove && props.kind === "left" && props.onMoveLinkedUnitToMarginTarget) {
+        return props.onMoveLinkedUnitToMarginTarget(
+          sourceMarginBlockId,
+          targetMarginBlockId,
+          position,
+        );
+      }
+
       let moved = false;
 
       editor.update(() => {
@@ -707,6 +796,22 @@ function MarginDragAndDropPlugin(): null {
     };
 
     const moveBlockWithKeyboard = (marginBlockId: string, direction: "up" | "down"): boolean => {
+      const sourceElement = rootRef.current?.querySelector<HTMLElement>(
+        `${MARGIN_BLOCK_SELECTOR}[data-margin-block-id="${marginBlockId}"]`,
+      );
+      const useUnitMove =
+        props.kind === "left" &&
+        isLinkedMarginBlockElement(sourceElement) &&
+        Boolean(direction === "up" ? props.onMoveLinkedUnitUp : props.onMoveLinkedUnitDown);
+      if (useUnitMove) {
+        if (direction === "up") {
+          props.onMoveLinkedUnitUp?.(marginBlockId);
+        } else {
+          props.onMoveLinkedUnitDown?.(marginBlockId);
+        }
+        return true;
+      }
+
       let moved = false;
 
       editor.update(() => {
@@ -815,7 +920,7 @@ function MarginDragAndDropPlugin(): null {
           dragState.sourceHandle.releasePointerCapture(dragState.pointerId);
         }
       } catch (error) {
-        console.warn("Failed to release pointer capture for marginalia drag", error);
+        disablePointerDrag("Pointer drag has been disabled after a pointer-capture failure.", error);
       }
 
       if (
@@ -829,6 +934,7 @@ function MarginDragAndDropPlugin(): null {
           dragState.sourceMarginBlockId,
           dragState.targetMarginBlockId,
           dragState.dropPosition,
+          dragState.sourceUsesUnitMove,
         );
       }
 
@@ -884,17 +990,29 @@ function MarginDragAndDropPlugin(): null {
         return;
       }
 
+      const sourceElement = handle.closest<HTMLElement>(MARGIN_BLOCK_SELECTOR);
+      const sourceUsesUnitMove =
+        props.kind === "left" &&
+        isLinkedMarginBlockElement(sourceElement) &&
+        Boolean(props.onMoveLinkedUnitToMarginTarget);
+
       event.preventDefault();
       keyboardGrabbedBlockIdRef.current = null;
       handle.focus();
 
-      const dragCandidates = collectDragCandidates(rootElement, sourceMarginBlockId);
+      const dragCandidates = collectDragCandidates(rootElement, sourceMarginBlockId, {
+        linkedOnly: sourceUsesUnitMove,
+      });
+      if (dragCandidates.length === 0) {
+        return;
+      }
       const { previousBodyUserSelect, previousBodyCursor } = lockGlobalDragStyles();
 
       pointerDragRef.current = {
         pointerId: event.pointerId,
         sourceMarginBlockId,
         sourceHandle: handle,
+        sourceUsesUnitMove,
         startX: event.clientX,
         startY: event.clientY,
         hasMoved: false,
@@ -909,7 +1027,16 @@ function MarginDragAndDropPlugin(): null {
       rootElement.dataset.dragging = "true";
       updateGrabbedHandleState(rootElement, sourceMarginBlockId);
 
-      handle.setPointerCapture(event.pointerId);
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch (error) {
+        pointerDragRef.current = null;
+        document.body.style.userSelect = previousBodyUserSelect;
+        document.body.style.cursor = previousBodyCursor;
+        clearVisualState();
+        disablePointerDrag("Pointer drag has been disabled after a pointer-capture failure.", error);
+        return;
+      }
       handle.addEventListener("lostpointercapture", onLostPointerCapture);
       window.addEventListener("pointermove", onPointerMove);
       window.addEventListener("pointerup", onPointerUp);
@@ -1000,7 +1127,14 @@ function MarginDragAndDropPlugin(): null {
       rootRef.current = null;
       unregister();
     };
-  }, [editor]);
+  }, [
+    editor,
+    props.kind,
+    props.onDisablePointerBlockDrag,
+    props.onMoveLinkedUnitDown,
+    props.onMoveLinkedUnitToMarginTarget,
+    props.onMoveLinkedUnitUp,
+  ]);
 
   return null;
 }
@@ -1008,17 +1142,39 @@ function MarginDragAndDropPlugin(): null {
 function MarginToolbar(props: {
   editorRef: MutableRefObject<LexicalEditor | null>;
   kind: MarginKind;
+  currentMarginBlockId: string | null;
   currentManuscriptBlockId: string | null;
   toolbarState: MarginToolbarState;
+  isFocused: boolean;
   onInsertLinkedBlock: () => void;
   canInsertLinkedBlock: boolean;
   onGoToLinkedManuscript: () => void;
+  onMoveLinkedUnitUp?: (marginBlockId: string) => void;
+  onMoveLinkedUnitDown?: (marginBlockId: string) => void;
   legacyDuplicateSummary?: {
     affectedUnitCount: number;
     duplicateScholieCount: number;
   } | null;
 }) {
   const copy = getMarginUiCopy(props.kind);
+  const useLinkedUnitMove =
+    props.kind === "left" &&
+    props.currentMarginBlockId != null &&
+    props.toolbarState.linkedManuscriptBlockId != null;
+  const moveUpLabel = useLinkedUnitMove ? "Move Unit Earlier" : "Move Earlier";
+  const moveDownLabel = useLinkedUnitMove ? "Move Unit Later" : "Move Later";
+  const showAwaitingPassage = props.toolbarState.linkedManuscriptBlockId == null;
+  const showPassageReady = showAwaitingPassage && props.currentManuscriptBlockId != null && props.isFocused;
+  const showEmptyScholie =
+    props.kind === "left" &&
+    props.toolbarState.linkedManuscriptBlockId != null &&
+    !props.toolbarState.hasContent;
+  const showContextGroup =
+    showAwaitingPassage ||
+    showPassageReady ||
+    showEmptyScholie ||
+    Boolean(props.kind === "left" && props.legacyDuplicateSummary);
+  const showToolbarCreateActions = props.kind === "right";
 
   const run = (callback: (editor: LexicalEditor) => void) => {
     const editor = props.editorRef.current;
@@ -1055,32 +1211,34 @@ function MarginToolbar(props: {
     <>
       <div className="editor-toolbar editor-toolbar-margin">
         <span className="editor-toolbar-label">{copy.toolbarLabel}</span>
-        <div className="toolbar-inline-group">
-          {copy.allowStandaloneCreate ? (
+        {showToolbarCreateActions ? (
+          <div className="toolbar-inline-group toolbar-inline-group-primary">
+            {copy.allowStandaloneCreate ? (
+              <button
+                className="toolbar-button toolbar-button-prominent"
+                type="button"
+                onClick={() =>
+                  run((editor) =>
+                    editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
+                      kind: props.kind,
+                      linkedManuscriptBlockId: null,
+                    }),
+                  )
+                }
+              >
+                {copy.createStandaloneLabel}
+              </button>
+            ) : null}
             <button
               className="toolbar-button toolbar-button-prominent"
               type="button"
-              onClick={() =>
-                run((editor) =>
-                  editor.dispatchCommand(INSERT_MARGINALIA_BLOCK_COMMAND, {
-                    kind: props.kind,
-                    linkedManuscriptBlockId: null,
-                  }),
-                )
-              }
+              onClick={props.onInsertLinkedBlock}
+              disabled={!props.canInsertLinkedBlock}
             >
-              {copy.createStandaloneLabel}
+              {copy.createLinkedLabel}
             </button>
-          ) : null}
-          <button
-            className="toolbar-button toolbar-button-prominent"
-            type="button"
-            onClick={props.onInsertLinkedBlock}
-            disabled={!props.canInsertLinkedBlock}
-          >
-            {copy.createLinkedLabel}
-          </button>
-        </div>
+          </div>
+        ) : null}
         <div className="toolbar-inline-group">
           <details className="editor-advanced-tools">
             <summary>Format</summary>
@@ -1201,7 +1359,7 @@ function MarginToolbar(props: {
               {copy.linkActionLabel}
             </button>
             <button className="toolbar-button toolbar-button-compact" type="button" onClick={props.onGoToLinkedManuscript}>
-              Go to Passage
+              {copy.navigateActionLabel}
             </button>
             <button
               className="toolbar-button toolbar-button-compact"
@@ -1241,16 +1399,28 @@ function MarginToolbar(props: {
             <button
               className="toolbar-button"
               type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND, undefined))}
+              onClick={() => {
+                if (useLinkedUnitMove && props.currentMarginBlockId && props.onMoveLinkedUnitUp) {
+                  props.onMoveLinkedUnitUp(props.currentMarginBlockId);
+                  return;
+                }
+                run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_UP_COMMAND, undefined));
+              }}
             >
-              Move Earlier
+              {moveUpLabel}
             </button>
             <button
               className="toolbar-button"
               type="button"
-              onClick={() => run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND, undefined))}
+              onClick={() => {
+                if (useLinkedUnitMove && props.currentMarginBlockId && props.onMoveLinkedUnitDown) {
+                  props.onMoveLinkedUnitDown(props.currentMarginBlockId);
+                  return;
+                }
+                run((editor) => editor.dispatchCommand(MOVE_CURRENT_MARGINALIA_BLOCK_DOWN_COMMAND, undefined));
+              }}
             >
-              Move Later
+              {moveDownLabel}
             </button>
             <button
               className="toolbar-button destructive-button"
@@ -1262,37 +1432,33 @@ function MarginToolbar(props: {
           </div>
         </details>
       </div>
-      <div className="margin-writing-status">
-        <div className="editor-context-group">
-          <span
-            className={`margin-status-chip ${
-              props.toolbarState.linkedManuscriptBlockId ? "is-linked" : "is-unlinked"
-            }`}
-          >
-            {props.toolbarState.linkedManuscriptBlockId ? copy.linkedStatusLabel : copy.unlinkedStatusLabel}
-          </span>
-          {props.currentManuscriptBlockId ? (
-            <span className="margin-status-chip is-targeting">Passage ready</span>
-          ) : null}
-          {props.kind === "left" && props.toolbarState.linkedManuscriptBlockId && !props.toolbarState.hasContent ? (
-            <span className="margin-status-chip">Empty scholie</span>
-          ) : null}
-          {props.kind === "left" && props.legacyDuplicateSummary ? (
-            <span className="margin-status-chip is-warning">
-              Legacy duplicates {props.legacyDuplicateSummary.duplicateScholieCount}
-            </span>
-          ) : null}
-        </div>
+      <div className="margin-writing-status" data-focused={props.isFocused ? "true" : "false"}>
+        {showContextGroup ? (
+          <div className="editor-context-group">
+            {showAwaitingPassage ? <span className="margin-status-chip is-unlinked">{copy.unlinkedStatusLabel}</span> : null}
+            {showPassageReady ? <span className="margin-status-chip is-targeting">Unit ready</span> : null}
+            {showEmptyScholie ? <span className="margin-status-chip">Empty scholie</span> : null}
+            {props.kind === "left" && props.legacyDuplicateSummary ? (
+              <span className="margin-status-chip is-warning">
+                Legacy duplicates {props.legacyDuplicateSummary.duplicateScholieCount}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <details className="context-help">
-          <summary>Help</summary>
+          <summary>Shortcuts</summary>
           <div className="context-help-body">
             <span className="margin-shortcut-hint">{copy.createShortcutHint}</span>
             <span className="margin-shortcut-hint">{copy.linkShortcutHint}</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+G jump to passage</span>
+            <span className="margin-shortcut-hint">{copy.navigateShortcutHint}</span>
             <span className="margin-shortcut-hint">{copy.duplicateShortcutHint}</span>
             <span className="margin-shortcut-hint">{copy.splitShortcutHint}</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Shift+Up merge upward</span>
-            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Shift+Down merge downward</span>
+            {props.kind === "left" && props.toolbarState.linkedManuscriptBlockId ? (
+              <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Up/Down move the attached unit</span>
+            ) : (
+              <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Up/Down move the current note</span>
+            )}
+            <span className="margin-shortcut-hint">Ctrl/Cmd+Alt+Shift+Up/Down merge with a neighbour</span>
             <span className="margin-shortcut-hint">{copy.deleteShortcutHint}</span>
           </div>
         </details>
@@ -1306,10 +1472,14 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
   ref,
 ) {
   const editorRef = useRef<LexicalEditor | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const revealTimeoutRef = useRef<number | null>(null);
   const currentManuscriptBlockId = useAppStore((state) => state.currentManuscriptBlockId);
+  const [currentMarginBlockId, setCurrentMarginBlockId] = useState<string | null>(null);
   const [toolbarState, setToolbarState] = useState<MarginToolbarState>(DEFAULT_MARGIN_TOOLBAR_STATE);
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
   const copy = useMemo(() => getMarginUiCopy(props.kind), [props.kind]);
+  const canCreateFromHeader = props.kind === "left" ? currentManuscriptBlockId != null : true;
 
   const autosave = useMemo(() => debounce((json: string) => props.onAutosave(json), 700), [props.onAutosave]);
   const linkIndexSave = useMemo(
@@ -1326,6 +1496,41 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
       marginToolbarStateEquals(previousState, nextState) ? previousState : nextState
     );
   }, []);
+  const handleCurrentBlockIdChange = useCallback(
+    (marginBlockId: string | null) => {
+      setCurrentMarginBlockId(marginBlockId);
+      props.onCurrentBlockIdChange(marginBlockId);
+    },
+    [props.onCurrentBlockIdChange],
+  );
+  useEffect(() => {
+    const shellElement = shellRef.current;
+    if (!shellElement) {
+      return;
+    }
+
+    const handleFocusIn = () => {
+      setIsEditorFocused(true);
+      props.onFocusChange?.(true);
+    };
+    const handleFocusOut = () => {
+      window.setTimeout(() => {
+        const activeElement = document.activeElement;
+        const focusedWithinShell = Boolean(
+          activeElement instanceof Node && shellElement.contains(activeElement),
+        );
+        setIsEditorFocused(focusedWithinShell);
+        props.onFocusChange?.(focusedWithinShell);
+      }, 0);
+    };
+
+    shellElement.addEventListener("focusin", handleFocusIn);
+    shellElement.addEventListener("focusout", handleFocusOut);
+    return () => {
+      shellElement.removeEventListener("focusin", handleFocusIn);
+      shellElement.removeEventListener("focusout", handleFocusOut);
+    };
+  }, [props.onFocusChange]);
   const handleBlurSave = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) {
@@ -1351,7 +1556,7 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
   }, [autosave, linkIndexSave]);
 
   useEffect(() => {
-    syncLinkedPreviews(editorRef.current?.getRootElement() ?? null, props.manuscriptExcerptByBlockId);
+    syncLinkedReferences(editorRef.current?.getRootElement() ?? null, props.manuscriptExcerptByBlockId);
   }, [props.manuscriptExcerptByBlockId]);
 
   const insertBlock = (
@@ -1660,7 +1865,12 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
   );
 
   return (
-    <div className="editor-shell editor-shell-margin">
+    <div
+      ref={shellRef}
+      className="editor-shell editor-shell-margin"
+      data-margin-kind={props.kind}
+      data-pointer-reorder-enabled={props.pointerBlockDragEnabled ? "true" : "false"}
+    >
       <div className="margin-header">
         <div className="margin-heading">
           <span className="margin-title">{props.title}</span>
@@ -1670,6 +1880,12 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
           className="toolbar-button margin-create-button"
           type="button"
           aria-label={copy.addButtonAriaLabel}
+          title={
+            props.kind === "left" && !canCreateFromHeader
+              ? "Select a unit in the manuscript first."
+              : copy.createLinkedLabel
+          }
+          disabled={!canCreateFromHeader}
           onClick={() => {
             if (props.kind === "left" && props.onRequestCreateLinkedNote) {
               props.onRequestCreateLinkedNote();
@@ -1685,11 +1901,15 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
         <MarginToolbar
           editorRef={editorRef}
           kind={props.kind}
+          currentMarginBlockId={currentMarginBlockId}
           currentManuscriptBlockId={currentManuscriptBlockId}
           toolbarState={toolbarState}
+          isFocused={isEditorFocused}
           onInsertLinkedBlock={props.onRequestCreateLinkedNote ?? (() => insertBlock(currentManuscriptBlockId))}
           canInsertLinkedBlock={Boolean(props.onRequestCreateLinkedNote) || Boolean(currentManuscriptBlockId)}
           onGoToLinkedManuscript={goToLinkedManuscript}
+          onMoveLinkedUnitUp={props.onMoveLinkedUnitUp}
+          onMoveLinkedUnitDown={props.onMoveLinkedUnitDown}
           legacyDuplicateSummary={props.legacyDuplicateSummary}
         />
         <div className="lexical-scroll margin-scroll">
@@ -1715,16 +1935,25 @@ export const MarginEditorBase = forwardRef<MarginEditorHandle, MarginEditorBaseP
         <MarginBridgePlugin
           kind={props.kind}
           editorRef={editorRef}
-          onCurrentBlockIdChange={props.onCurrentBlockIdChange}
+          onCurrentBlockIdChange={handleCurrentBlockIdChange}
           currentManuscriptBlockId={currentManuscriptBlockId}
           manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
           onGoToLinkedManuscript={goToLinkedManuscript}
+          onMoveLinkedUnitUp={props.onMoveLinkedUnitUp}
+          onMoveLinkedUnitDown={props.onMoveLinkedUnitDown}
           onToolbarStateChange={handleToolbarStateChange}
           onRequestCreateLinkedNote={props.onRequestCreateLinkedNote}
-          onFocusChange={props.onFocusChange}
           onBlurSave={handleBlurSave}
         />
-        {ENABLE_POINTER_BLOCK_DRAG ? <MarginDragAndDropPlugin /> : null}
+        {props.pointerBlockDragEnabled ? (
+          <MarginDragAndDropPlugin
+            kind={props.kind}
+            onMoveLinkedUnitUp={props.onMoveLinkedUnitUp}
+            onMoveLinkedUnitDown={props.onMoveLinkedUnitDown}
+            onMoveLinkedUnitToMarginTarget={props.onMoveLinkedUnitToMarginTarget}
+            onDisablePointerBlockDrag={props.onDisablePointerBlockDrag}
+          />
+        ) : null}
       </LexicalComposer>
     </div>
   );

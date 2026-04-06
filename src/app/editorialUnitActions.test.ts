@@ -243,6 +243,12 @@ class FakeEditorialEnvironment {
   }
 }
 
+function linkedMarginBlockIdsFor(environment: FakeEditorialEnvironment, manuscriptBlockId: string): string[] {
+  return environment.leftBlocks
+    .filter((block) => block.linkedManuscriptBlockId === manuscriptBlockId)
+    .map((block) => block.marginBlockId);
+}
+
 test("createUnitAfter inserts a linked scholie in manuscript order and keeps focus in the manuscript pane", () => {
   const environment = new FakeEditorialEnvironment({
     manuscriptBlockIds: ["m-1", "m-2"],
@@ -269,6 +275,26 @@ test("createUnitAfter inserts a linked scholie in manuscript order and keeps foc
   );
   assert.deepEqual(environment.focused, ["manuscript:m-100", "editor:center"]);
   assert.equal(environment.activePane, "center");
+});
+
+test("scholie invariant: creating a unit gives the new passage exactly one linked left scholie", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1", "m-2"],
+    leftBlocks: [
+      { marginBlockId: "left-1", linkedManuscriptBlockId: "m-1", text: "Scholie A" },
+      { marginBlockId: "left-2", linkedManuscriptBlockId: "m-2", text: "Scholie B" },
+    ],
+    activePane: "center",
+    currentManuscriptBlockId: "m-1",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const createdBlockId = coordinator.createUnitAfter();
+
+  assert.equal(createdBlockId, "m-100");
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-100"), ["left-100"]);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-1"), ["left-1"]);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-2"), ["left-2"]);
 });
 
 test("createUnitAfterBlock inserts a linked unit without requiring a current selection", () => {
@@ -366,6 +392,27 @@ test("duplicateCurrentUnit copies only the primary scholie for a legacy unit", (
   );
 });
 
+test("scholie invariant: duplicating a unit does not copy legacy duplicate scholies onto the new passage", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1", "m-2"],
+    leftBlocks: [
+      { marginBlockId: "left-1", linkedManuscriptBlockId: "m-1", text: "Primary scholie" },
+      { marginBlockId: "left-1-dup", linkedManuscriptBlockId: "m-1", text: "Legacy duplicate" },
+      { marginBlockId: "left-2", linkedManuscriptBlockId: "m-2", text: "Next scholie" },
+    ],
+    activePane: "center",
+    currentManuscriptBlockId: "m-1",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const duplicatedBlockId = coordinator.duplicateCurrentUnit();
+
+  assert.equal(duplicatedBlockId, "m-100");
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-1"), ["left-1", "left-1-dup"]);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-100"), ["left-100"]);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-2"), ["left-2"]);
+});
+
 test("moveCurrentUnitDown reorders the linked scholie cluster and preserves left focus", () => {
   const environment = new FakeEditorialEnvironment({
     manuscriptBlockIds: ["m-1", "m-2"],
@@ -393,6 +440,127 @@ test("moveCurrentUnitDown reorders the linked scholie cluster and preserves left
   assert.equal(environment.activePane, "left");
 });
 
+test("scholie invariant: moving a unit preserves the same linked scholie cluster for each passage", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1", "m-2"],
+    leftBlocks: [
+      { marginBlockId: "left-1", linkedManuscriptBlockId: "m-1", text: "Primary scholie" },
+      { marginBlockId: "left-1-dup", linkedManuscriptBlockId: "m-1", text: "Legacy duplicate" },
+      { marginBlockId: "left-2", linkedManuscriptBlockId: "m-2", text: "Next scholie" },
+    ],
+    activePane: "left",
+    currentLeftMarginBlockId: "left-1-dup",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const moved = coordinator.moveCurrentUnitDown();
+
+  assert.equal(moved, true);
+  assert.deepEqual(environment.manuscriptBlockIds, ["m-2", "m-1"]);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-1"), ["left-1", "left-1-dup"]);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-2"), ["left-2"]);
+});
+
+test("moveUnitDownFromMarginBlock reorders a linked unit even when the active pane is not left", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1", "m-2"],
+    leftBlocks: [
+      { marginBlockId: "left-1", linkedManuscriptBlockId: "m-1", text: "Primary scholie" },
+      { marginBlockId: "left-1-dup", linkedManuscriptBlockId: "m-1", text: "Legacy duplicate" },
+      { marginBlockId: "left-2", linkedManuscriptBlockId: "m-2", text: "Next scholie" },
+    ],
+    activePane: "center",
+    currentManuscriptBlockId: "m-2",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const moved = coordinator.moveUnitDownFromMarginBlock("left-1-dup");
+
+  assert.equal(moved, true);
+  assert.deepEqual(environment.manuscriptBlockIds, ["m-2", "m-1"]);
+  assert.deepEqual(
+    environment.leftBlocks.map((block) => [block.marginBlockId, block.linkedManuscriptBlockId]),
+    [
+      ["left-2", "m-2"],
+      ["left-1", "m-1"],
+      ["left-1-dup", "m-1"],
+    ],
+  );
+  assert.deepEqual(environment.focused, ["left:left-1-dup", "editor:left"]);
+  assert.equal(environment.activePane, "left");
+});
+
+test("moveUnitToMarginTargetFromMarginBlock reorders a linked unit after another linked unit", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1", "m-2", "m-3"],
+    leftBlocks: [
+      { marginBlockId: "left-1", linkedManuscriptBlockId: "m-1", text: "First scholie" },
+      { marginBlockId: "left-free", linkedManuscriptBlockId: null, text: "Free scholie" },
+      { marginBlockId: "left-2", linkedManuscriptBlockId: "m-2", text: "Second scholie" },
+      { marginBlockId: "left-3", linkedManuscriptBlockId: "m-3", text: "Third scholie" },
+    ],
+    activePane: "left",
+    currentLeftMarginBlockId: "left-1",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const moved = coordinator.moveUnitToMarginTargetFromMarginBlock("left-1", "left-3", "after");
+
+  assert.equal(moved, true);
+  assert.deepEqual(environment.manuscriptBlockIds, ["m-2", "m-3", "m-1"]);
+  assert.deepEqual(
+    environment.leftBlocks.map((block) => [block.marginBlockId, block.linkedManuscriptBlockId]),
+    [
+      ["left-free", null],
+      ["left-2", "m-2"],
+      ["left-3", "m-3"],
+      ["left-1", "m-1"],
+    ],
+  );
+  assert.deepEqual(environment.focused, ["left:left-1", "editor:left"]);
+  assert.equal(environment.activePane, "left");
+});
+
+test("moveUnitToMarginTargetFromMarginBlock ignores free scholies as drop anchors", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1", "m-2"],
+    leftBlocks: [
+      { marginBlockId: "left-1", linkedManuscriptBlockId: "m-1", text: "First scholie" },
+      { marginBlockId: "left-free", linkedManuscriptBlockId: null, text: "Free scholie" },
+      { marginBlockId: "left-2", linkedManuscriptBlockId: "m-2", text: "Second scholie" },
+    ],
+    activePane: "left",
+    currentLeftMarginBlockId: "left-1",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const moved = coordinator.moveUnitToMarginTargetFromMarginBlock("left-1", "left-free", "before");
+
+  assert.equal(moved, false);
+  assert.deepEqual(environment.manuscriptBlockIds, ["m-1", "m-2"]);
+  assert.deepEqual(environment.focused, []);
+});
+
+test("moveUnitUpFromMarginBlock ignores free scholies that are not attached to a passage", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1"],
+    leftBlocks: [{ marginBlockId: "left-free", linkedManuscriptBlockId: null, text: "Free scholie" }],
+    activePane: "center",
+    currentManuscriptBlockId: "m-1",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const moved = coordinator.moveUnitUpFromMarginBlock("left-free");
+
+  assert.equal(moved, false);
+  assert.deepEqual(environment.manuscriptBlockIds, ["m-1"]);
+  assert.deepEqual(
+    environment.leftBlocks.map((block) => [block.marginBlockId, block.linkedManuscriptBlockId]),
+    [["left-free", null]],
+  );
+  assert.deepEqual(environment.focused, []);
+});
+
 test("deleteCurrentUnit removes all linked scholies for a legacy unit and focuses the next scholie", () => {
   const environment = new FakeEditorialEnvironment({
     manuscriptBlockIds: ["m-1", "m-2"],
@@ -416,6 +584,27 @@ test("deleteCurrentUnit removes all linked scholies for a legacy unit and focuse
   );
   assert.deepEqual(environment.focused, ["left:left-2", "editor:left"]);
   assert.equal(environment.activePane, "left");
+});
+
+test("scholie invariant: deleting a unit removes every scholie linked to the deleted passage", () => {
+  const environment = new FakeEditorialEnvironment({
+    manuscriptBlockIds: ["m-1", "m-2"],
+    leftBlocks: [
+      { marginBlockId: "left-1", linkedManuscriptBlockId: "m-1", text: "Primary scholie" },
+      { marginBlockId: "left-1-dup", linkedManuscriptBlockId: "m-1", text: "Legacy duplicate" },
+      { marginBlockId: "left-2", linkedManuscriptBlockId: "m-2", text: "Next scholie" },
+    ],
+    activePane: "left",
+    currentLeftMarginBlockId: "left-1",
+  });
+  const coordinator = createEditorialUnitCoordinator(environment.dependencies());
+
+  const focusedBlockId = coordinator.deleteCurrentUnit();
+
+  assert.equal(focusedBlockId, "m-2");
+  assert.deepEqual(environment.manuscriptBlockIds, ["m-2"]);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-1"), []);
+  assert.deepEqual(linkedMarginBlockIdsFor(environment, "m-2"), ["left-2"]);
 });
 
 test("left-pane unit actions stay disabled when the selected scholie is not linked to a manuscript block", () => {

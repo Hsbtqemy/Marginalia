@@ -193,6 +193,39 @@ export function buildPrintPreviewHtml(options: {
         font-size: calc(var(--preview-font-size-pt) * var(--preview-h3-scale) * 1pt);
       }
 
+      .print-content ol,
+      .print-content ul {
+        padding-left: 1.4em;
+      }
+
+      .print-scholie,
+      .print-unit-sources,
+      .print-annex {
+        margin-top: 0.8em;
+        margin-bottom: 1em;
+      }
+
+      .print-scholie,
+      .print-annex {
+        border-left: 2px solid rgba(0, 0, 0, 0.18);
+        padding-left: 0.9em;
+      }
+
+      .print-note-label {
+        font-size: 0.85em;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .print-unit-sources {
+        padding-left: 1.2em;
+      }
+
+      .print-annex-list {
+        padding-left: 1.2em;
+      }
+
       @page {
         size: ${pageSize};
         margin-top: calc(var(--preview-margin-top-mm) * 1mm);

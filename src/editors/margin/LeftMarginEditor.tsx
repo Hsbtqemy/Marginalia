@@ -11,6 +11,15 @@ interface LeftMarginEditorProps {
   onLinkIndexChange: (index: Record<string, string[]>) => void;
   onNavigateToManuscriptBlock: (manuscriptBlockId: string) => void;
   onRequestCreateLinkedNote?: () => void;
+  onMoveLinkedUnitUp?: (marginBlockId: string) => void;
+  onMoveLinkedUnitDown?: (marginBlockId: string) => void;
+  onMoveLinkedUnitToMarginTarget?: (
+    sourceMarginBlockId: string,
+    targetMarginBlockId: string,
+    position: "before" | "after",
+  ) => boolean;
+  pointerBlockDragEnabled: boolean;
+  onDisablePointerBlockDrag?: (message: string) => void;
   onFocusChange?: (focused: boolean) => void;
   legacyDuplicateSummary?: {
     affectedUnitCount: number;
@@ -25,7 +34,7 @@ export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEdi
         ref={ref}
         kind="left"
         title="Scholies"
-        subtitle="Commentary aligned to manuscript blocks."
+        subtitle="Critical glosses aligned to the draft."
         initialStateJson={props.initialStateJson}
         manuscriptExcerptByBlockId={props.manuscriptExcerptByBlockId}
         onAutosave={props.onAutosave}
@@ -33,6 +42,11 @@ export const LeftMarginEditor = forwardRef<LeftMarginEditorHandle, LeftMarginEdi
         onLinkIndexChange={props.onLinkIndexChange}
         onNavigateToManuscriptBlock={props.onNavigateToManuscriptBlock}
         onRequestCreateLinkedNote={props.onRequestCreateLinkedNote}
+        onMoveLinkedUnitUp={props.onMoveLinkedUnitUp}
+        onMoveLinkedUnitDown={props.onMoveLinkedUnitDown}
+        onMoveLinkedUnitToMarginTarget={props.onMoveLinkedUnitToMarginTarget}
+        pointerBlockDragEnabled={props.pointerBlockDragEnabled}
+        onDisablePointerBlockDrag={props.onDisablePointerBlockDrag}
         onFocusChange={props.onFocusChange}
         legacyDuplicateSummary={props.legacyDuplicateSummary}
       />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import type { Menu } from "@tauri-apps/api/menu";
 import { invoke } from "@tauri-apps/api/core";
 import { Store } from "@tauri-apps/plugin-store";
@@ -36,11 +36,30 @@ import { buildMarginLinkIndexFromLexicalJson } from "../editors/margin/marginali
 import { buildManuscriptExcerptIndexFromLexicalJson } from "../editors/manuscript/lexicalBlocks/indexing";
 import { buildPrintPreviewHtml } from "../utils/printPreview";
 import { debounce } from "../utils/debounce";
+import { deriveCanonicalDocumentModelFromEditorStates } from "../document/canonicalDocumentModel";
+import { buildEditorialExportDocument, renderEditorialExportHtml } from "../export/editorialExport";
 import { createEditorialUnitCoordinator } from "./editorialUnitActions";
+import { createEditorialUnitCoordinatorDependencies } from "./editorialUnitCoordinatorDeps";
 import { createLinkedMarginaliaScheduler } from "./linkedMarginalia";
 import { releaseStuckPointerState } from "./pointerState";
 
 const PREFS_FILE = "ui-preferences.json";
+
+function excerptIndexEquals(a: Record<string, string>, b: Record<string, string>): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 function sanitizeFilename(text: string): string {
   return text
@@ -77,6 +96,7 @@ export default function App() {
     defaultPresetId,
     pagePreview,
     rightPaneVisible,
+    pointerBlockDragEnabled,
     presetManagerOpen,
     themeMode,
     highContrast,
@@ -98,6 +118,7 @@ export default function App() {
     setDefaultPresetId,
     setPagePreview,
     setRightPaneVisible,
+    setPointerBlockDragEnabled,
     setPresetManagerOpen,
     setThemeMode,
     setHighContrast,
@@ -125,6 +146,13 @@ export default function App() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
   const [activePane, setActivePane] = useState<"left" | "center" | "right" | null>("center");
+  const persistedManuscriptExcerptByBlockId = useMemo(
+    () => buildManuscriptExcerptIndexFromLexicalJson(manuscriptJson),
+    [manuscriptJson],
+  );
+  const [liveManuscriptExcerptByBlockId, setLiveManuscriptExcerptByBlockId] = useState<Record<string, string>>(
+    persistedManuscriptExcerptByBlockId,
+  );
 
   const persistPreference = useCallback(
     async (key: string, value: unknown) => {
@@ -225,7 +253,8 @@ export default function App() {
             highContrast: false,
             pagePreview: false,
             rightPaneVisible: false,
-            paneSizes: { left: 0.22, right: 0.18 },
+            pointerBlockDragEnabled: true,
+            paneSizes: { left: 0.18, right: 0.16 },
           },
         });
         if (!active) {
@@ -237,12 +266,15 @@ export default function App() {
         const storedHighContrast = (await loadedPrefs.get<boolean>("highContrast")) ?? false;
         const storedPagePreview = (await loadedPrefs.get<boolean>("pagePreview")) ?? false;
         const storedRightPaneVisible = (await loadedPrefs.get<boolean>("rightPaneVisible")) ?? false;
-        const storedPaneSizes = (await loadedPrefs.get<PaneSizes>("paneSizes")) ?? { left: 0.22, right: 0.18 };
+        const storedPointerBlockDragEnabled =
+          (await loadedPrefs.get<boolean>("pointerBlockDragEnabled")) ?? true;
+        const storedPaneSizes = (await loadedPrefs.get<PaneSizes>("paneSizes")) ?? { left: 0.18, right: 0.16 };
 
         setThemeMode(storedThemeMode);
         setHighContrast(storedHighContrast);
         setPagePreview(storedPagePreview);
         setRightPaneVisible(storedRightPaneVisible);
+        setPointerBlockDragEnabled(storedPointerBlockDragEnabled);
         setPaneSizes(storedPaneSizes);
 
         const seeded = await seedInitialData(loadedDb);
@@ -358,11 +390,39 @@ export default function App() {
     const fromState = presets.find((preset) => preset.id === defaultPresetId);
     return fromState ?? presets[0] ?? BUILTIN_PRESETS[0] ?? null;
   }, [defaultPresetId, presets]);
+  const documentCountLabel = `${documents.length} draft${documents.length === 1 ? "" : "s"}`;
 
-  const manuscriptExcerptByBlockId = useMemo(
-    () => buildManuscriptExcerptIndexFromLexicalJson(manuscriptJson),
-    [manuscriptJson],
+  const closeTopbarMenu = useCallback((target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const menu = target.closest("details");
+    if (menu instanceof HTMLDetailsElement) {
+      menu.open = false;
+    }
+  }, []);
+
+  const runTopbarMenuAction = useCallback(
+    (event: MouseEvent<HTMLButtonElement>, action: () => void) => {
+      closeTopbarMenu(event.currentTarget);
+      action();
+    },
+    [closeTopbarMenu],
   );
+
+  useEffect(() => {
+    setLiveManuscriptExcerptByBlockId((previous) =>
+      excerptIndexEquals(previous, persistedManuscriptExcerptByBlockId)
+        ? previous
+        : persistedManuscriptExcerptByBlockId,
+    );
+  }, [currentDocumentId, persistedManuscriptExcerptByBlockId]);
+
+  const handleManuscriptExcerptIndexChange = useCallback((nextIndex: Record<string, string>) => {
+    setLiveManuscriptExcerptByBlockId((previous) =>
+      excerptIndexEquals(previous, nextIndex) ? previous : nextIndex,
+    );
+  }, []);
 
   const editorialUnitProjection = useMemo(
     () =>
@@ -554,6 +614,26 @@ export default function App() {
     void persistPreference("rightPaneVisible", next);
   }, [persistPreference, setRightPaneVisible]);
 
+  const handleSetPointerBlockDragEnabled = useCallback(
+    (enabled: boolean) => {
+      setPointerBlockDragEnabled(enabled);
+      void persistPreference("pointerBlockDragEnabled", enabled);
+    },
+    [persistPreference, setPointerBlockDragEnabled],
+  );
+
+  const handleTogglePointerBlockDrag = useCallback(() => {
+    handleSetPointerBlockDragEnabled(!useAppStore.getState().pointerBlockDragEnabled);
+  }, [handleSetPointerBlockDragEnabled]);
+
+  const handleDisablePointerBlockDrag = useCallback(
+    (message: string) => {
+      handleSetPointerBlockDragEnabled(false);
+      setStatusMessage(message);
+    },
+    [handleSetPointerBlockDragEnabled],
+  );
+
   const handleSetThemeMode = useCallback(
     (mode: ThemeMode) => {
       setThemeMode(mode);
@@ -641,51 +721,17 @@ export default function App() {
 
   const editorialUnitCoordinator = useMemo(
     () =>
-      createEditorialUnitCoordinator({
-        getActivePane: () => activePane,
-        setActivePane,
-        getCurrentManuscriptBlockId: () => useAppStore.getState().currentManuscriptBlockId,
-        getCurrentLeftMarginBlockId: () => useAppStore.getState().leftCurrentBlockId,
-        listManuscriptBlockIds: () => manuscriptEditorRef.current?.listBlockIds() ?? [],
-        insertManuscriptBlockBefore: (blockId) =>
-          manuscriptEditorRef.current?.insertBlockBefore(blockId) ?? null,
-        insertManuscriptBlockAfter: (blockId) =>
-          manuscriptEditorRef.current?.insertBlockAfter(blockId) ?? null,
-        duplicateManuscriptBlock: (blockId) =>
-          manuscriptEditorRef.current?.duplicateBlock(blockId) ?? null,
-        moveManuscriptBlockUp: (blockId) =>
-          manuscriptEditorRef.current?.moveBlockUp(blockId) ?? null,
-        moveManuscriptBlockDown: (blockId) =>
-          manuscriptEditorRef.current?.moveBlockDown(blockId) ?? null,
-        deleteManuscriptBlock: (blockId) => manuscriptEditorRef.current?.deleteBlock(blockId) ?? null,
-        findMarginBlockIdsForLinkedManuscript: (manuscriptBlockId) =>
-          leftEditorRef.current?.findBlockIdsForLinkedManuscript(manuscriptBlockId) ?? [],
-        getLinkedManuscriptBlockIdForMarginBlock: (marginBlockId) =>
-          leftEditorRef.current?.getLinkedManuscriptBlockIdForBlock(marginBlockId) ?? null,
-        insertLinkedMarginBlock: (manuscriptBlockId, options) =>
-          leftEditorRef.current?.insertBlock(manuscriptBlockId, options) ?? null,
-        duplicateMarginBlock: (marginBlockId, options) =>
-          leftEditorRef.current?.duplicateBlockById(marginBlockId, options) ?? null,
-        moveMarginBlockBefore: (marginBlockId, beforeMarginBlockId, options) =>
-          leftEditorRef.current?.moveBlockBefore(marginBlockId, beforeMarginBlockId, options) ?? false,
-        moveMarginBlockAfter: (marginBlockId, afterMarginBlockId, options) =>
-          leftEditorRef.current?.moveBlockAfter(marginBlockId, afterMarginBlockId, options) ?? false,
-        deleteMarginBlocks: (marginBlockIds) =>
-          leftEditorRef.current?.deleteBlocksById(marginBlockIds) ?? 0,
-        focusManuscriptBlockById: (manuscriptBlockId) => {
-          manuscriptEditorRef.current?.focusBlockById(manuscriptBlockId);
-        },
-        focusManuscriptEditor: () => {
-          manuscriptEditorRef.current?.focusEditor();
-        },
-        focusMarginBlockById: (marginBlockId) => {
-          leftEditorRef.current?.focusBlockById(marginBlockId);
-        },
-        focusMarginEditor: () => {
-          leftEditorRef.current?.focusEditor();
-        },
-        reportError,
-      }),
+      createEditorialUnitCoordinator(
+        createEditorialUnitCoordinatorDependencies({
+          activePane,
+          setActivePane,
+          getCurrentManuscriptBlockId: () => useAppStore.getState().currentManuscriptBlockId,
+          getCurrentLeftMarginBlockId: () => useAppStore.getState().leftCurrentBlockId,
+          manuscriptEditorRef,
+          leftEditorRef,
+          reportError,
+        }),
+      ),
     [activePane, reportError],
   );
 
@@ -738,16 +784,38 @@ export default function App() {
     editorialUnitCoordinator.moveCurrentUnitDown();
   }, [editorialUnitCoordinator]);
 
+  const handleMoveUnitUpFromLeftMargin = useCallback(
+    (marginBlockId: string) => {
+      editorialUnitCoordinator.moveUnitUpFromMarginBlock(marginBlockId);
+    },
+    [editorialUnitCoordinator],
+  );
+
+  const handleMoveUnitDownFromLeftMargin = useCallback(
+    (marginBlockId: string) => {
+      editorialUnitCoordinator.moveUnitDownFromMarginBlock(marginBlockId);
+    },
+    [editorialUnitCoordinator],
+  );
+
+  const handleMoveUnitToMarginTargetFromLeftMargin = useCallback(
+    (sourceMarginBlockId: string, targetMarginBlockId: string, position: "before" | "after") =>
+      editorialUnitCoordinator.moveUnitToMarginTargetFromMarginBlock(
+        sourceMarginBlockId,
+        targetMarginBlockId,
+        position,
+      ),
+    [editorialUnitCoordinator],
+  );
+
   const handleDeleteCurrentUnit = useCallback(() => {
     editorialUnitCoordinator.deleteCurrentUnit();
   }, [editorialUnitCoordinator]);
 
   const quickInsertUnitTitle =
-    editorialUnitProjection.units.length === 0
-      ? "Unit: start first passage"
-      : currentUnitActionsEnabled
-        ? "Unit: add next passage"
-        : "Unit: append passage at end";
+    currentUnitActionsEnabled
+      ? "Unit: add next unit"
+      : "Unit: add unit";
 
   const handleReviewLegacyLeftDuplicates = useCallback(() => {
     const primaryMarginBlockId = legacyLeftDuplicateSummary?.firstPrimaryLeftMarginBlockId;
@@ -768,7 +836,7 @@ export default function App() {
     }
 
     setStatusMessage(
-      `${normalizedCount} duplicate ${normalizedCount > 1 ? "scholies were" : "scholie was"} detached as free scholies. The first linked scholie remains primary for each passage.`,
+      `${normalizedCount} duplicate ${normalizedCount > 1 ? "scholies were" : "scholie was"} detached as free scholies. The first linked scholie remains primary for each unit.`,
     );
     setActivePane("left");
   }, []);
@@ -778,11 +846,19 @@ export default function App() {
       return;
     }
 
-    const manuscriptHtml = manuscriptEditorRef.current?.getHtml() ?? "";
+    const manuscriptStateForExport = manuscriptEditorRef.current?.getLexicalJson() ?? manuscriptJson;
+    const leftMarginStateForExport = leftEditorRef.current?.getLexicalJson() ?? leftMarginJson;
+    const rightMarginStateForExport = rightEditorRef.current?.getLexicalJson() ?? rightMarginJson;
+    const canonicalModel = deriveCanonicalDocumentModelFromEditorStates({
+      manuscriptJson: manuscriptStateForExport,
+      leftMarginJson: leftMarginStateForExport,
+      rightMarginJson: rightMarginStateForExport,
+    });
+    const manuscriptHtml = renderEditorialExportHtml(buildEditorialExportDocument(canonicalModel, "clean"));
     const title = currentDocument?.title ?? "Untitled Draft";
     setPrintPreviewHtml(buildPrintPreviewHtml({ title, manuscriptHtml, preset: activePreset }));
     setPrintPreviewOpen(true);
-  }, [activePreset, currentDocument]);
+  }, [activePreset, currentDocument, leftMarginJson, manuscriptJson, rightMarginJson]);
 
   const exportDocx = useCallback(
     async (profile: "clean" | "working") => {
@@ -806,15 +882,22 @@ export default function App() {
         return;
       }
 
+      const manuscriptStateForExport = manuscriptEditorRef.current?.getLexicalJson() ?? manuscriptJson;
+      const leftMarginStateForExport = leftEditorRef.current?.getLexicalJson() ?? leftMarginJson;
+      const rightMarginStateForExport = rightEditorRef.current?.getLexicalJson() ?? rightMarginJson;
+      const canonicalModel = deriveCanonicalDocumentModelFromEditorStates({
+        manuscriptJson: manuscriptStateForExport,
+        leftMarginJson: leftMarginStateForExport,
+        rightMarginJson: rightMarginStateForExport,
+      });
+      const editorialExport = buildEditorialExportDocument(canonicalModel, profile);
       const payload = {
         outputPath,
         documentTitle: currentDocument.title,
         profile,
-        manuscriptJson: manuscriptEditorRef.current?.getLexicalJson() ?? manuscriptJson,
-        marginLeftJson: leftEditorRef.current?.getLexicalJson() ?? leftMarginJson,
-        marginRightJson: rightEditorRef.current?.getLexicalJson() ?? rightMarginJson,
+        editorialExportJson: JSON.stringify(editorialExport),
         preset: activePreset,
-        includeUnlinkedLeftAnnex: true,
+        includeSupplementalLeftAnnex: true,
       };
       try {
         await invoke("export_docx", { payload });
@@ -910,6 +993,13 @@ export default function App() {
         onSelect: handleToggleRightPane,
       },
       {
+        id: "view.toggle-pointer-drag",
+        title: pointerBlockDragEnabled ? "Disable pointer drag reorder" : "Enable pointer drag reorder",
+        section: "View",
+        keywords: ["mouse drag reorder scholie source margin handle"],
+        onSelect: handleTogglePointerBlockDrag,
+      },
+      {
         id: "focus.manuscript",
         title: "Jump to manuscript",
         section: "Focus",
@@ -941,7 +1031,7 @@ export default function App() {
       },
       {
         id: "unit.insert-before",
-        title: "Unit: insert before current passage",
+        title: "Unit: insert before current unit",
         section: "Units",
         disabled: !currentUnitActionsEnabled,
         keywords: ["passage block insert before unit scholie"],
@@ -949,7 +1039,7 @@ export default function App() {
       },
       {
         id: "unit.insert-after",
-        title: "Unit: insert after current passage",
+        title: "Unit: insert after current unit",
         section: "Units",
         disabled: !currentUnitActionsEnabled,
         keywords: ["passage block insert after unit scholie"],
@@ -957,7 +1047,7 @@ export default function App() {
       },
       {
         id: "unit.duplicate",
-        title: "Unit: duplicate current passage",
+        title: "Unit: duplicate current unit",
         section: "Units",
         disabled: !currentUnitActionsEnabled,
         keywords: ["copy clone block passage scholie"],
@@ -965,23 +1055,25 @@ export default function App() {
       },
       {
         id: "unit.move-up",
-        title: "Unit: move current passage up",
+        title: "Unit: move current unit earlier",
         section: "Units",
         disabled: !currentUnitActionsEnabled,
+        shortcut: "Ctrl/Cmd+Alt+ArrowUp",
         keywords: ["reorder block passage previous scholie"],
         onSelect: handleMoveCurrentUnitUp,
       },
       {
         id: "unit.move-down",
-        title: "Unit: move current passage down",
+        title: "Unit: move current unit later",
         section: "Units",
         disabled: !currentUnitActionsEnabled,
+        shortcut: "Ctrl/Cmd+Alt+ArrowDown",
         keywords: ["reorder block passage next scholie"],
         onSelect: handleMoveCurrentUnitDown,
       },
       {
         id: "unit.delete",
-        title: "Unit: delete current passage",
+        title: "Unit: delete current unit",
         section: "Units",
         disabled: !currentUnitActionsEnabled,
         keywords: ["remove trash block passage scholie"],
@@ -989,11 +1081,11 @@ export default function App() {
       },
       {
         id: "left.new-linked",
-        title: "Scholies: add for current passage",
+        title: "Scholies: add to current unit",
         section: "Scholies",
         disabled: false,
         shortcut: "Ctrl/Cmd+Alt+N",
-        keywords: ["scholie passage commentary anchor manuscript"],
+        keywords: ["scholie passage unit commentary anchor manuscript"],
         onSelect: () => handleCreateLinkedMarginalia(currentManuscriptBlockId),
       },
       {
@@ -1109,10 +1201,13 @@ export default function App() {
       handleDuplicateCurrentUnit,
       handleMoveCurrentUnitDown,
       handleMoveCurrentUnitUp,
+      handleMoveUnitDownFromLeftMargin,
+      handleMoveUnitUpFromLeftMargin,
       handleNewDocument,
       handleOpenPrintPreview,
       handleQuickInsertUnit,
       handleRenameDocument,
+      handleTogglePointerBlockDrag,
       handleTogglePagePreview,
       handleToggleRightPane,
       quickInsertUnitTitle,
@@ -1121,6 +1216,7 @@ export default function App() {
       legacyLeftDuplicateSummary,
       leftCurrentBlockId,
       pagePreview,
+      pointerBlockDragEnabled,
       rightCurrentBlockId,
       rightPaneVisible,
     ],
@@ -1143,6 +1239,7 @@ export default function App() {
         {
           pagePreview,
           rightPaneVisible,
+          pointerBlockDragEnabled,
           themeMode,
           highContrast,
         },
@@ -1155,6 +1252,7 @@ export default function App() {
           onExportPdf: handleOpenPrintPreview,
           onTogglePagePreview: handleTogglePagePreview,
           onToggleRightPane: handleToggleRightPane,
+          onTogglePointerBlockDrag: handleTogglePointerBlockDrag,
           onSetTheme: handleSetThemeMode,
           onToggleHighContrast: handleToggleHighContrast,
           onOpenPresetManager: () => setPresetManagerOpen(true),
@@ -1182,11 +1280,13 @@ export default function App() {
     handleRenameDocument,
     handleSetThemeMode,
     handleToggleHighContrast,
+    handleTogglePointerBlockDrag,
     handleTogglePagePreview,
     handleToggleRightPane,
     highContrast,
     initialized,
     pagePreview,
+    pointerBlockDragEnabled,
     rightPaneVisible,
     setPresetManagerOpen,
     themeMode,
@@ -1208,32 +1308,128 @@ export default function App() {
     <div className="app-shell">
       <header className="app-topbar">
         <div className="app-topbar-document">
-          <div className="app-topbar-title">Marginalia</div>
-          <select
-            className="app-select app-document-select"
-            value={currentDocumentId}
-            onChange={(event) => {
-              void loadDocumentIntoEditors(event.target.value);
-            }}
-          >
-            {documents.map((document) => (
-              <option key={document.id} value={document.id}>
-                {document.title}
-              </option>
-            ))}
-          </select>
+          <div className="app-topbar-kicker">Marginalia</div>
+          <div className="app-topbar-document-copy">
+            <div className="app-topbar-document-heading">
+              <h1 className="app-topbar-title">{currentDocument?.title ?? "Untitled Draft"}</h1>
+              <button type="button" className="app-chip app-chip-button" onClick={() => setPresetManagerOpen(true)}>
+                {activePreset?.name ?? "Export style"}
+              </button>
+            </div>
+            <div className="app-topbar-document-meta">
+              <label className="app-topbar-document-picker">
+                <span>Open draft</span>
+                <select
+                  className="app-select app-document-select"
+                  value={currentDocumentId}
+                  onChange={(event) => {
+                    void loadDocumentIntoEditors(event.target.value);
+                  }}
+                >
+                  {documents.map((document) => (
+                    <option key={document.id} value={document.id}>
+                      {document.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="app-topbar-document-count">{documentCountLabel}</span>
+            </div>
+          </div>
         </div>
 
         <div className="app-topbar-actions">
-          <button className="secondary-button" type="button" onClick={() => void handleNewDocument()}>
-            New
-          </button>
-          <button className="secondary-button" type="button" onClick={() => setPresetManagerOpen(true)}>
-            Export Styles...
-          </button>
-          <button className="secondary-button" type="button" onClick={handleOpenPrintPreview}>
-            Page Preview
-          </button>
+          <details className="app-topbar-menu">
+            <summary>Document</summary>
+            <div className="app-topbar-menu-body">
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                onClick={(event) => runTopbarMenuAction(event, () => void handleNewDocument())}
+              >
+                New Draft
+              </button>
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                onClick={(event) => runTopbarMenuAction(event, () => void handleRenameDocument())}
+              >
+                Rename This Draft
+              </button>
+              <button
+                className="secondary-button destructive-button app-topbar-menu-item"
+                type="button"
+                onClick={(event) => runTopbarMenuAction(event, () => void handleDeleteDocument())}
+              >
+                Delete This Draft
+              </button>
+            </div>
+          </details>
+          <details className="app-topbar-menu">
+            <summary>Export</summary>
+            <div className="app-topbar-menu-body">
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                disabled={!activePreset}
+                onClick={(event) => runTopbarMenuAction(event, () => void exportDocx("clean"))}
+              >
+                Export DOCX Clean Draft
+              </button>
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                disabled={!activePreset}
+                onClick={(event) => runTopbarMenuAction(event, () => void exportDocx("working"))}
+              >
+                Export DOCX Working Draft
+              </button>
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                disabled={!activePreset}
+                onClick={(event) => runTopbarMenuAction(event, handleOpenPrintPreview)}
+              >
+                Print or Save PDF
+              </button>
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                onClick={(event) => runTopbarMenuAction(event, () => setPresetManagerOpen(true))}
+              >
+                Manage Export Styles
+              </button>
+            </div>
+          </details>
+          <details className="app-topbar-menu">
+            <summary>View</summary>
+            <div className="app-topbar-menu-body">
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                data-active={pagePreview ? "true" : "false"}
+                onClick={(event) => runTopbarMenuAction(event, handleTogglePagePreview)}
+              >
+                {pagePreview ? "Disable Page Preview" : "Enable Page Preview"}
+              </button>
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                data-active={rightPaneVisible ? "true" : "false"}
+                onClick={(event) => runTopbarMenuAction(event, handleToggleRightPane)}
+              >
+                {rightPaneVisible ? "Hide Sources Pane" : "Show Sources Pane"}
+              </button>
+              <button
+                className="secondary-button app-topbar-menu-item"
+                type="button"
+                data-active={pointerBlockDragEnabled ? "true" : "false"}
+                onClick={(event) => runTopbarMenuAction(event, handleTogglePointerBlockDrag)}
+              >
+                {pointerBlockDragEnabled ? "Disable Pointer Drag" : "Enable Pointer Drag"}
+              </button>
+            </div>
+          </details>
           <button className="secondary-button" type="button" onClick={() => setCommandPaletteOpen(true)}>
             Quick Actions
           </button>
@@ -1254,9 +1450,9 @@ export default function App() {
           <span>
             Legacy scholies detected: {legacyLeftDuplicateSummary.duplicateScholieCount} duplicate
             {legacyLeftDuplicateSummary.duplicateScholieCount > 1 ? " scholies" : " scholie"} across{" "}
-            {legacyLeftDuplicateSummary.affectedUnitCount} passage
+            {legacyLeftDuplicateSummary.affectedUnitCount} unit
             {legacyLeftDuplicateSummary.affectedUnitCount > 1 ? "s" : ""}. The first scholie stays
-            primary for each passage; you can detach the extras as free scholies now.
+            primary for each unit; you can detach the extras as free scholies now.
           </span>
           <div className="status-banner-actions">
             <button type="button" className="ghost-button" onClick={handleReviewLegacyLeftDuplicates}>
@@ -1279,13 +1475,18 @@ export default function App() {
             key={`left-${currentDocumentId}`}
             ref={leftEditorRef}
             initialStateJson={leftMarginJson}
-            manuscriptExcerptByBlockId={manuscriptExcerptByBlockId}
+            manuscriptExcerptByBlockId={liveManuscriptExcerptByBlockId}
             onAutosave={saveLeftMargin}
             onCurrentBlockIdChange={setLeftCurrentBlockId}
             onLinkIndexChange={setLeftLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}
             onRequestCreateLinkedNote={() => handleCreateLinkedMarginalia(currentManuscriptBlockId)}
             legacyDuplicateSummary={legacyLeftDuplicateSummary}
+            onMoveLinkedUnitUp={handleMoveUnitUpFromLeftMargin}
+            onMoveLinkedUnitDown={handleMoveUnitDownFromLeftMargin}
+            onMoveLinkedUnitToMarginTarget={handleMoveUnitToMarginTargetFromLeftMargin}
+            pointerBlockDragEnabled={pointerBlockDragEnabled}
+            onDisablePointerBlockDrag={handleDisablePointerBlockDrag}
             onFocusChange={(focused) => {
               if (focused) {
                 setActivePane("left");
@@ -1298,6 +1499,7 @@ export default function App() {
             key={`manuscript-${currentDocumentId}`}
             ref={manuscriptEditorRef}
             initialStateJson={manuscriptJson}
+            unitCount={editorialUnitProjection.units.length}
             pagePreview={pagePreview}
             onAutosave={saveManuscript}
             onCurrentBlockIdChange={setCurrentManuscriptBlockId}
@@ -1313,6 +1515,7 @@ export default function App() {
             onMoveUnitUp={handleMoveCurrentUnitUp}
             onMoveUnitDown={handleMoveCurrentUnitDown}
             onDeleteUnit={handleDeleteCurrentUnit}
+            onExcerptIndexChange={handleManuscriptExcerptIndexChange}
             onFocusChange={(focused) => {
               if (focused) {
                 setActivePane("center");
@@ -1325,11 +1528,13 @@ export default function App() {
             key={`right-${currentDocumentId}`}
             ref={rightEditorRef}
             initialStateJson={rightMarginJson}
-            manuscriptExcerptByBlockId={manuscriptExcerptByBlockId}
+            manuscriptExcerptByBlockId={liveManuscriptExcerptByBlockId}
             onAutosave={saveRightMargin}
             onCurrentBlockIdChange={setRightCurrentBlockId}
             onLinkIndexChange={setRightLinksByManuscriptBlockId}
             onNavigateToManuscriptBlock={handleNavigateToManuscriptBlock}
+            pointerBlockDragEnabled={pointerBlockDragEnabled}
+            onDisablePointerBlockDrag={handleDisablePointerBlockDrag}
             onFocusChange={(focused) => {
               if (focused) {
                 setActivePane("right");

@@ -8,6 +8,7 @@ import {
 } from "../presets/presetSchema";
 import { normalizeLinkedManuscriptBlocks } from "../editors/manuscript/lexicalBlocks/linkableBlockNormalization";
 import { newUuid } from "../utils/uuid";
+import { syncCanonicalDocumentModelFromEditorStates } from "./documentModelRepository";
 import { runInTransaction, runSerializedWrite } from "./writeUtils";
 
 export interface DocumentRecord {
@@ -22,6 +23,13 @@ export interface DocumentStateBundle {
   leftMarginJson: string;
   rightMarginJson: string;
   defaultPresetId: string | null;
+}
+
+export interface LegacyDocumentMigrationReport {
+  migratedDocumentCount: number;
+  migratedDocumentIds: string[];
+  documentsNeedingReviewCount: number;
+  documentsNeedingReviewIds: string[];
 }
 
 const DEFAULT_DOCUMENT_TITLE = "Untitled Document";
@@ -90,13 +98,13 @@ function defaultManuscriptState(): string {
   return JSON.stringify(
     createRoot([
       createParagraphNode("Start writing your manuscript here."),
-      createParagraphNode("Use Cmd/Ctrl+Alt+N to add a scholie for the current passage."),
+      createParagraphNode("Use Cmd/Ctrl+Alt+N to add a scholie to the current unit."),
     ]),
   );
 }
 
 function defaultLeftMarginState(): string {
-  return JSON.stringify(createRoot([]));
+  return emptyEditorState();
 }
 
 function defaultRightMarginState(): string {
@@ -174,6 +182,173 @@ async function ensureDocumentStates(db: Database, documentId: string): Promise<v
   );
 }
 
+async function selectStoredEditorStates(
+  db: Database,
+  documentId: string,
+): Promise<{ manuscriptJson: string; leftMarginJson: string; rightMarginJson: string }> {
+  const manuscriptRow = await db.select<Array<{ lexical_json: string }>>(
+    "SELECT lexical_json FROM manuscript_states WHERE document_id = $1",
+    [documentId],
+  );
+  const leftRow = await db.select<Array<{ lexical_json: string }>>(
+    "SELECT lexical_json FROM margin_left_states WHERE document_id = $1",
+    [documentId],
+  );
+  const rightRow = await db.select<Array<{ lexical_json: string }>>(
+    "SELECT lexical_json FROM margin_right_states WHERE document_id = $1",
+    [documentId],
+  );
+
+  return {
+    manuscriptJson: manuscriptRow[0]?.lexical_json ?? defaultManuscriptState(),
+    leftMarginJson: leftRow[0]?.lexical_json ?? defaultLeftMarginState(),
+    rightMarginJson: rightRow[0]?.lexical_json ?? defaultRightMarginState(),
+  };
+}
+
+function emptyEditorState(): string {
+  return JSON.stringify(createRoot([]));
+}
+
+function hasParsableLexicalRootChildren(lexicalJson: string): boolean {
+  if (!lexicalJson) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(lexicalJson) as {
+      root?: {
+        children?: unknown[];
+      };
+    };
+    return Array.isArray(parsed.root?.children);
+  } catch {
+    return false;
+  }
+}
+
+function documentHasInvalidLegacyState(states: {
+  manuscriptJson: string;
+  leftMarginJson: string;
+  rightMarginJson: string;
+}): boolean {
+  return !(
+    hasParsableLexicalRootChildren(states.manuscriptJson) &&
+    hasParsableLexicalRootChildren(states.leftMarginJson) &&
+    hasParsableLexicalRootChildren(states.rightMarginJson)
+  );
+}
+
+function sanitizeStoredEditorStatesForOpen(states: {
+  manuscriptJson: string;
+  leftMarginJson: string;
+  rightMarginJson: string;
+}): {
+  manuscriptJson: string;
+  leftMarginJson: string;
+  rightMarginJson: string;
+  changed: boolean;
+} {
+  const manuscriptJson = hasParsableLexicalRootChildren(states.manuscriptJson)
+    ? states.manuscriptJson
+    : emptyEditorState();
+  const leftMarginJson = hasParsableLexicalRootChildren(states.leftMarginJson)
+    ? states.leftMarginJson
+    : emptyEditorState();
+  const rightMarginJson = hasParsableLexicalRootChildren(states.rightMarginJson)
+    ? states.rightMarginJson
+    : emptyEditorState();
+
+  return {
+    manuscriptJson,
+    leftMarginJson,
+    rightMarginJson,
+    changed:
+      manuscriptJson !== states.manuscriptJson ||
+      leftMarginJson !== states.leftMarginJson ||
+      rightMarginJson !== states.rightMarginJson,
+  };
+}
+
+async function syncCanonicalDocumentModelFromStoredStates(db: Database, documentId: string): Promise<void> {
+  await ensureDocumentStates(db, documentId);
+  const states = await selectStoredEditorStates(db, documentId);
+  const normalizedManuscript = normalizeLinkedManuscriptBlocks(
+    states.manuscriptJson,
+    states.leftMarginJson,
+    states.rightMarginJson,
+  );
+
+  if (normalizedManuscript.changed) {
+    await db.execute(
+      "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+      [documentId, normalizedManuscript.lexicalJson, Date.now()],
+    );
+  }
+
+  await syncCanonicalDocumentModelFromEditorStates(db, {
+    documentId,
+    manuscriptJson: normalizedManuscript.lexicalJson,
+    leftMarginJson: states.leftMarginJson,
+    rightMarginJson: states.rightMarginJson,
+  });
+}
+
+function documentNeedsLegacyReview(model: Awaited<ReturnType<typeof syncCanonicalDocumentModelFromEditorStates>>["model"]): boolean {
+  return (
+    Object.keys(model.legacyDiagnostics.duplicateLeftMarginBlockIdsByUnitId).length > 0 ||
+    model.legacyDiagnostics.unlinkedLeftMarginBlockIds.length > 0 ||
+    model.legacyDiagnostics.staleLinkedLeftMarginBlockIds.length > 0
+  );
+}
+
+export async function migrateLegacyDocumentsToCanonicalModel(db: Database): Promise<LegacyDocumentMigrationReport> {
+  const documents = await listDocuments(db);
+  const migratedDocumentIds: string[] = [];
+  const documentsNeedingReviewIds: string[] = [];
+
+  await runSerializedWrite(db, async () => {
+    for (const document of documents) {
+      await ensureDocumentStates(db, document.id);
+      const states = await selectStoredEditorStates(db, document.id);
+      const normalizedManuscript = normalizeLinkedManuscriptBlocks(
+        states.manuscriptJson,
+        states.leftMarginJson,
+        states.rightMarginJson,
+      );
+
+      if (normalizedManuscript.changed) {
+        await db.execute(
+          "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+          [document.id, normalizedManuscript.lexicalJson, Date.now()],
+        );
+      }
+
+      const syncResult = await syncCanonicalDocumentModelFromEditorStates(db, {
+        documentId: document.id,
+        manuscriptJson: normalizedManuscript.lexicalJson,
+        leftMarginJson: states.leftMarginJson,
+        rightMarginJson: states.rightMarginJson,
+      });
+
+      if (syncResult.wrote) {
+        migratedDocumentIds.push(document.id);
+      }
+
+      if (documentHasInvalidLegacyState(states) || documentNeedsLegacyReview(syncResult.model)) {
+        documentsNeedingReviewIds.push(document.id);
+      }
+    }
+  });
+
+  return {
+    migratedDocumentCount: migratedDocumentIds.length,
+    migratedDocumentIds,
+    documentsNeedingReviewCount: documentsNeedingReviewIds.length,
+    documentsNeedingReviewIds,
+  };
+}
+
 async function ensureBuiltInPresets(db: Database): Promise<void> {
   for (const preset of BUILTIN_PRESETS) {
     await db.execute(
@@ -205,6 +380,25 @@ export async function createDocument(db: Database, title = DEFAULT_DOCUMENT_TITL
       ]);
 
       await ensureDocumentStates(db, id);
+      const initialStates = await selectStoredEditorStates(db, id);
+      const normalizedManuscript = normalizeLinkedManuscriptBlocks(
+        initialStates.manuscriptJson,
+        initialStates.leftMarginJson,
+        initialStates.rightMarginJson,
+      );
+      if (normalizedManuscript.changed) {
+        await db.execute(
+          "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+          [id, normalizedManuscript.lexicalJson, now],
+        );
+      }
+      await syncCanonicalDocumentModelFromEditorStates(db, {
+        documentId: id,
+        manuscriptJson: normalizedManuscript.lexicalJson,
+        leftMarginJson: initialStates.leftMarginJson,
+        rightMarginJson: initialStates.rightMarginJson,
+        updatedAt: now,
+      });
       await ensureDocumentExportSetting(db, id, BUILTIN_PRESETS[0].id);
     });
   });
@@ -232,42 +426,54 @@ export async function deleteDocument(db: Database, documentId: string): Promise<
 export async function getDocumentStateBundle(db: Database, documentId: string): Promise<DocumentStateBundle> {
   await ensureDocumentStates(db, documentId);
 
-  const manuscriptRow = await db.select<Array<{ lexical_json: string }>>(
-    "SELECT lexical_json FROM manuscript_states WHERE document_id = $1",
-    [documentId],
-  );
-  const leftRow = await db.select<Array<{ lexical_json: string }>>(
-    "SELECT lexical_json FROM margin_left_states WHERE document_id = $1",
-    [documentId],
-  );
-  const rightRow = await db.select<Array<{ lexical_json: string }>>(
-    "SELECT lexical_json FROM margin_right_states WHERE document_id = $1",
-    [documentId],
-  );
+  const storedStates = await selectStoredEditorStates(db, documentId);
+  const sanitizedStates = sanitizeStoredEditorStatesForOpen(storedStates);
 
   const exportRow = await db.select<Array<{ default_preset_id: string | null }>>(
     "SELECT default_preset_id FROM document_export_settings WHERE document_id = $1",
     [documentId],
   );
 
-  const leftMarginJson = leftRow[0]?.lexical_json ?? defaultLeftMarginState();
-  const rightMarginJson = rightRow[0]?.lexical_json ?? defaultRightMarginState();
-  const rawManuscriptJson = manuscriptRow[0]?.lexical_json ?? defaultManuscriptState();
+  const leftMarginJson = sanitizedStates.leftMarginJson;
+  const rightMarginJson = sanitizedStates.rightMarginJson;
+  const rawManuscriptJson = sanitizedStates.manuscriptJson;
 
   const normalizedManuscript = normalizeLinkedManuscriptBlocks(rawManuscriptJson, leftMarginJson, rightMarginJson);
+  const manuscriptJson = normalizedManuscript.lexicalJson;
 
-  if (normalizedManuscript.changed) {
+  if (sanitizedStates.changed || normalizedManuscript.changed) {
     const now = Date.now();
     await runSerializedWrite(db, async () => {
-      await db.execute(
-        "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
-        [documentId, normalizedManuscript.lexicalJson, now],
-      );
+      if (sanitizedStates.manuscriptJson !== storedStates.manuscriptJson || normalizedManuscript.changed) {
+        await db.execute(
+          "INSERT INTO manuscript_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+          [documentId, manuscriptJson, now],
+        );
+      }
+      if (sanitizedStates.leftMarginJson !== storedStates.leftMarginJson) {
+        await db.execute(
+          "INSERT INTO margin_left_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+          [documentId, leftMarginJson, now],
+        );
+      }
+      if (sanitizedStates.rightMarginJson !== storedStates.rightMarginJson) {
+        await db.execute(
+          "INSERT INTO margin_right_states(document_id, lexical_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT(document_id) DO UPDATE SET lexical_json = excluded.lexical_json, updated_at = excluded.updated_at",
+          [documentId, rightMarginJson, now],
+        );
+      }
     });
   }
 
+  await syncCanonicalDocumentModelFromEditorStates(db, {
+    documentId,
+    manuscriptJson,
+    leftMarginJson,
+    rightMarginJson,
+  });
+
   return {
-    manuscriptJson: normalizedManuscript.lexicalJson,
+    manuscriptJson,
     leftMarginJson,
     rightMarginJson,
     defaultPresetId: exportRow[0]?.default_preset_id ?? BUILTIN_PRESETS[0].id,
@@ -286,6 +492,7 @@ export async function saveManuscriptState(db: Database, documentId: string, lexi
       [documentId, lexicalJson, now],
     );
     await touchDocument(db, documentId);
+    await syncCanonicalDocumentModelFromStoredStates(db, documentId);
   });
 }
 
@@ -297,6 +504,7 @@ export async function saveLeftMarginState(db: Database, documentId: string, lexi
       [documentId, lexicalJson, now],
     );
     await touchDocument(db, documentId);
+    await syncCanonicalDocumentModelFromStoredStates(db, documentId);
   });
 }
 
@@ -308,6 +516,7 @@ export async function saveRightMarginState(db: Database, documentId: string, lex
       [documentId, lexicalJson, now],
     );
     await touchDocument(db, documentId);
+    await syncCanonicalDocumentModelFromStoredStates(db, documentId);
   });
 }
 
@@ -361,6 +570,7 @@ export async function seedInitialData(db: Database): Promise<{ defaultDocumentId
   const defaultDocumentId = documents[0].id;
   await ensureDocumentStates(db, defaultDocumentId);
   await ensureDocumentExportSetting(db, defaultDocumentId, BUILTIN_PRESETS[0].id);
+  await migrateLegacyDocumentsToCanonicalModel(db);
 
   return { defaultDocumentId };
 }

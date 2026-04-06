@@ -55,6 +55,24 @@ export interface EditorialUnitActionDependencies {
   reportError: (message: string, error: unknown) => void;
 }
 
+function createUnitSelection(
+  manuscriptBlockId: string | null,
+  options?: {
+    preferredPane?: "left" | "center";
+    preferredMarginBlockId?: string | null;
+  },
+): EditorialUnitSelection | null {
+  if (!manuscriptBlockId) {
+    return null;
+  }
+
+  return {
+    manuscriptBlockId,
+    preferredPane: options?.preferredPane ?? "center",
+    preferredMarginBlockId: options?.preferredMarginBlockId ?? null,
+  };
+}
+
 function resolveCurrentUnitSelection(
   dependencies: EditorialUnitActionDependencies,
 ): EditorialUnitSelection | null {
@@ -63,40 +81,46 @@ function resolveCurrentUnitSelection(
   const currentManuscriptBlockId = dependencies.getCurrentManuscriptBlockId();
 
   if (activePane === "left" && currentMarginBlockId) {
-    const manuscriptBlockId =
-      dependencies.getLinkedManuscriptBlockIdForMarginBlock(currentMarginBlockId);
-    if (!manuscriptBlockId) {
-      return null;
-    }
-    return {
-      manuscriptBlockId,
-      preferredPane: "left",
-      preferredMarginBlockId: currentMarginBlockId,
-    };
+    return createUnitSelection(
+      dependencies.getLinkedManuscriptBlockIdForMarginBlock(currentMarginBlockId),
+      {
+        preferredPane: "left",
+        preferredMarginBlockId: currentMarginBlockId,
+      },
+    );
   }
 
   if (currentManuscriptBlockId) {
-    return {
-      manuscriptBlockId: currentManuscriptBlockId,
+    return createUnitSelection(currentManuscriptBlockId, {
       preferredPane: "center",
       preferredMarginBlockId: null,
-    };
+    });
   }
 
   if (currentMarginBlockId) {
-    const manuscriptBlockId =
-      dependencies.getLinkedManuscriptBlockIdForMarginBlock(currentMarginBlockId);
-    if (!manuscriptBlockId) {
-      return null;
-    }
-    return {
-      manuscriptBlockId,
-      preferredPane: "left",
-      preferredMarginBlockId: currentMarginBlockId,
-    };
+    return createUnitSelection(
+      dependencies.getLinkedManuscriptBlockIdForMarginBlock(currentMarginBlockId),
+      {
+        preferredPane: "left",
+        preferredMarginBlockId: currentMarginBlockId,
+      },
+    );
   }
 
   return null;
+}
+
+function resolveUnitSelectionFromMarginBlock(
+  dependencies: EditorialUnitActionDependencies,
+  marginBlockId: string,
+): EditorialUnitSelection | null {
+  return createUnitSelection(
+    dependencies.getLinkedManuscriptBlockIdForMarginBlock(marginBlockId),
+    {
+      preferredPane: "left",
+      preferredMarginBlockId: marginBlockId,
+    },
+  );
 }
 
 function listLinkedMarginBlockIds(
@@ -223,6 +247,13 @@ export function createEditorialUnitCoordinator(
   duplicateCurrentUnit: () => string | null;
   moveCurrentUnitUp: () => boolean;
   moveCurrentUnitDown: () => boolean;
+  moveUnitUpFromMarginBlock: (marginBlockId: string) => boolean;
+  moveUnitDownFromMarginBlock: (marginBlockId: string) => boolean;
+  moveUnitToMarginTargetFromMarginBlock: (
+    sourceMarginBlockId: string,
+    targetMarginBlockId: string,
+    position: "before" | "after",
+  ) => boolean;
   deleteCurrentUnit: () => string | null;
 } {
   const run = <T>(message: string, action: () => T): T | null => {
@@ -303,6 +334,125 @@ export function createEditorialUnitCoordinator(
     );
   };
 
+  const moveUnit = (
+    direction: "up" | "down",
+    selection: EditorialUnitSelection | null,
+  ): boolean =>
+    Boolean(
+      run("A unit could not be moved.", () => {
+        if (!selection) {
+          return false;
+        }
+
+        const linkedMarginBlockIds = dependencies.findMarginBlockIdsForLinkedManuscript(
+          selection.manuscriptBlockId,
+        );
+        const movedManuscriptBlockId =
+          direction === "up"
+            ? dependencies.moveManuscriptBlockUp(selection.manuscriptBlockId)
+            : dependencies.moveManuscriptBlockDown(selection.manuscriptBlockId);
+        if (!movedManuscriptBlockId) {
+          return false;
+        }
+
+        reorderLinkedMarginBlocks(
+          dependencies,
+          selection.manuscriptBlockId,
+          linkedMarginBlockIds,
+        );
+
+        const focusedMarginBlockId =
+          selection.preferredMarginBlockId &&
+          linkedMarginBlockIds.includes(selection.preferredMarginBlockId)
+            ? selection.preferredMarginBlockId
+            : linkedMarginBlockIds[0] ?? null;
+
+        focusUnitTarget(
+          dependencies,
+          selection.manuscriptBlockId,
+          selection.preferredPane,
+          focusedMarginBlockId,
+        );
+
+        return true;
+      }),
+    );
+
+  const moveUnitToMarginTarget = (
+    sourceMarginBlockId: string,
+    targetMarginBlockId: string,
+    position: "before" | "after",
+  ): boolean =>
+    Boolean(
+      run("A unit could not be moved.", () => {
+        const sourceSelection = resolveUnitSelectionFromMarginBlock(dependencies, sourceMarginBlockId);
+        const targetSelection = resolveUnitSelectionFromMarginBlock(dependencies, targetMarginBlockId);
+        if (!sourceSelection || !targetSelection) {
+          return false;
+        }
+        if (sourceSelection.manuscriptBlockId === targetSelection.manuscriptBlockId) {
+          return false;
+        }
+
+        const manuscriptBlockIds = dependencies.listManuscriptBlockIds();
+        let sourceIndex = manuscriptBlockIds.indexOf(sourceSelection.manuscriptBlockId);
+        const targetIndex = manuscriptBlockIds.indexOf(targetSelection.manuscriptBlockId);
+        if (sourceIndex < 0 || targetIndex < 0) {
+          return false;
+        }
+
+        let desiredIndex = position === "before" ? targetIndex : targetIndex + 1;
+        if (sourceIndex < desiredIndex) {
+          desiredIndex -= 1;
+        }
+        desiredIndex = Math.max(0, Math.min(manuscriptBlockIds.length - 1, desiredIndex));
+        if (sourceIndex === desiredIndex) {
+          return false;
+        }
+
+        const linkedMarginBlockIds = dependencies.findMarginBlockIdsForLinkedManuscript(
+          sourceSelection.manuscriptBlockId,
+        );
+
+        while (sourceIndex > desiredIndex) {
+          const moved = dependencies.moveManuscriptBlockUp(sourceSelection.manuscriptBlockId);
+          if (!moved) {
+            return false;
+          }
+          sourceIndex -= 1;
+        }
+
+        while (sourceIndex < desiredIndex) {
+          const moved = dependencies.moveManuscriptBlockDown(sourceSelection.manuscriptBlockId);
+          if (!moved) {
+            return false;
+          }
+          sourceIndex += 1;
+        }
+
+        reorderLinkedMarginBlocks(
+          dependencies,
+          sourceSelection.manuscriptBlockId,
+          linkedMarginBlockIds,
+        );
+
+        const focusedMarginBlockId =
+          sourceSelection.preferredMarginBlockId &&
+          linkedMarginBlockIds.includes(sourceSelection.preferredMarginBlockId)
+            ? sourceSelection.preferredMarginBlockId
+            : linkedMarginBlockIds[0] ?? null;
+
+        focusUnitTarget(
+          dependencies,
+          sourceSelection.manuscriptBlockId,
+          sourceSelection.preferredPane,
+          focusedMarginBlockId,
+        );
+
+        return true;
+      }),
+    );
+
   return {
     hasAnyUnits: () => dependencies.listManuscriptBlockIds().length > 0,
     canResolveCurrentUnit: () => resolveCurrentUnitSelection(dependencies) != null,
@@ -355,82 +505,14 @@ export function createEditorialUnitCoordinator(
 
         return duplicatedManuscriptBlockId;
       }) ?? null,
-    moveCurrentUnitUp: () =>
-      Boolean(
-        run("A unit could not be moved.", () => {
-          const currentUnit = resolveCurrentUnitSelection(dependencies);
-          if (!currentUnit) {
-            return false;
-          }
-
-          const linkedMarginBlockIds = dependencies.findMarginBlockIdsForLinkedManuscript(
-            currentUnit.manuscriptBlockId,
-          );
-          const movedManuscriptBlockId = dependencies.moveManuscriptBlockUp(currentUnit.manuscriptBlockId);
-          if (!movedManuscriptBlockId) {
-            return false;
-          }
-
-          reorderLinkedMarginBlocks(
-            dependencies,
-            currentUnit.manuscriptBlockId,
-            linkedMarginBlockIds,
-          );
-
-          const focusedMarginBlockId =
-            currentUnit.preferredMarginBlockId &&
-            linkedMarginBlockIds.includes(currentUnit.preferredMarginBlockId)
-              ? currentUnit.preferredMarginBlockId
-              : linkedMarginBlockIds[0] ?? null;
-
-          focusUnitTarget(
-            dependencies,
-            currentUnit.manuscriptBlockId,
-            currentUnit.preferredPane,
-            focusedMarginBlockId,
-          );
-
-          return true;
-        }),
-      ),
-    moveCurrentUnitDown: () =>
-      Boolean(
-        run("A unit could not be moved.", () => {
-          const currentUnit = resolveCurrentUnitSelection(dependencies);
-          if (!currentUnit) {
-            return false;
-          }
-
-          const linkedMarginBlockIds = dependencies.findMarginBlockIdsForLinkedManuscript(
-            currentUnit.manuscriptBlockId,
-          );
-          const movedManuscriptBlockId = dependencies.moveManuscriptBlockDown(currentUnit.manuscriptBlockId);
-          if (!movedManuscriptBlockId) {
-            return false;
-          }
-
-          reorderLinkedMarginBlocks(
-            dependencies,
-            currentUnit.manuscriptBlockId,
-            linkedMarginBlockIds,
-          );
-
-          const focusedMarginBlockId =
-            currentUnit.preferredMarginBlockId &&
-            linkedMarginBlockIds.includes(currentUnit.preferredMarginBlockId)
-              ? currentUnit.preferredMarginBlockId
-              : linkedMarginBlockIds[0] ?? null;
-
-          focusUnitTarget(
-            dependencies,
-            currentUnit.manuscriptBlockId,
-            currentUnit.preferredPane,
-            focusedMarginBlockId,
-          );
-
-          return true;
-        }),
-      ),
+    moveCurrentUnitUp: () => moveUnit("up", resolveCurrentUnitSelection(dependencies)),
+    moveCurrentUnitDown: () => moveUnit("down", resolveCurrentUnitSelection(dependencies)),
+    moveUnitUpFromMarginBlock: (marginBlockId) =>
+      moveUnit("up", resolveUnitSelectionFromMarginBlock(dependencies, marginBlockId)),
+    moveUnitDownFromMarginBlock: (marginBlockId) =>
+      moveUnit("down", resolveUnitSelectionFromMarginBlock(dependencies, marginBlockId)),
+    moveUnitToMarginTargetFromMarginBlock: (sourceMarginBlockId, targetMarginBlockId, position) =>
+      moveUnitToMarginTarget(sourceMarginBlockId, targetMarginBlockId, position),
     deleteCurrentUnit: () =>
       run("A unit could not be deleted.", () => {
         const currentUnit = resolveCurrentUnitSelection(dependencies);

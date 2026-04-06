@@ -18,10 +18,10 @@ interface ThreePaneLayoutProps {
   onPaneSizesChange: (sizes: PaneSizes) => void;
 }
 
-const MIN_LEFT_RATIO = 0.15;
-const MAX_LEFT_RATIO = 0.24;
-const MIN_RIGHT_RATIO = 0.14;
-const MAX_RIGHT_RATIO = 0.22;
+const MIN_LEFT_RATIO = 0.13;
+const MAX_LEFT_RATIO = 0.22;
+const MIN_RIGHT_RATIO = 0.12;
+const MAX_RIGHT_RATIO = 0.2;
 const ENABLE_POINTER_RESIZE = false;
 
 function clamp(value: number, min: number, max: number): number {

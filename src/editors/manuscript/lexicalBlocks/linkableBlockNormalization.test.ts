@@ -12,7 +12,7 @@ function blockIdOf(node: Record<string, unknown>): string | null {
     : null;
 }
 
-test("normalizeLinkedManuscriptBlocks keeps only ids used by linked margin notes", () => {
+test("normalizeLinkedManuscriptBlocks preserves existing ids across all manuscript blocks", () => {
   const manuscriptJson = JSON.stringify({
     root: {
       children: [
@@ -61,7 +61,7 @@ test("normalizeLinkedManuscriptBlocks keeps only ids used by linked margin notes
   });
 
   const normalized = normalizeLinkedManuscriptBlocks(manuscriptJson, leftMarginJson, rightMarginJson);
-  assert.equal(normalized.changed, true);
+  assert.equal(normalized.changed, false);
 
   const parsed = JSON.parse(normalized.lexicalJson) as {
     root: { children: Array<Record<string, unknown>> };
@@ -70,18 +70,27 @@ test("normalizeLinkedManuscriptBlocks keeps only ids used by linked margin notes
   const listChildren = Array.isArray(list.children) ? (list.children as Array<Record<string, unknown>>) : [];
 
   assert.equal(blockIdOf(p1), "keep-p");
-  assert.equal(blockIdOf(p2), null);
-  assert.equal(blockIdOf(listChildren[0]), null);
+  assert.equal(blockIdOf(p2), "drop-p");
+  assert.equal(blockIdOf(listChildren[0]), "drop-li");
   assert.equal(blockIdOf(listChildren[1]), "keep-li");
 });
 
-test("normalizeLinkedManuscriptBlocks is a no-op when no removable ids exist", () => {
+test("normalizeLinkedManuscriptBlocks assigns missing ids to manuscript blocks", () => {
   const manuscriptJson = JSON.stringify({
     root: {
       children: [
         {
           type: "paragraph",
           children: [{ type: "text", text: "No id here" }],
+        },
+        {
+          type: "list",
+          children: [
+            {
+              type: "listitem",
+              children: [{ type: "text", text: "List item without id" }],
+            },
+          ],
         },
       ],
     },
@@ -93,8 +102,15 @@ test("normalizeLinkedManuscriptBlocks is a no-op when no removable ids exist", (
     JSON.stringify({ root: { children: [] } }),
   );
 
-  assert.equal(normalized.changed, false);
-  assert.equal(normalized.lexicalJson, manuscriptJson);
+  assert.equal(normalized.changed, true);
+  const parsed = JSON.parse(normalized.lexicalJson) as {
+    root: { children: Array<Record<string, unknown>> };
+  };
+  const [paragraph, list] = parsed.root.children;
+  const listChildren = Array.isArray(list.children) ? (list.children as Array<Record<string, unknown>>) : [];
+
+  assert.match(blockIdOf(paragraph) ?? "", /.+/);
+  assert.match(blockIdOf(listChildren[0]) ?? "", /.+/);
 });
 
 test("normalizeLinkedManuscriptBlocks tolerates invalid JSON", () => {

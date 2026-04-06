@@ -35,6 +35,7 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 | PAIR-03  | P1       | UX           | Autoriser la scholie vide, reduite ou developpee                   | S      | Faible |
 | LAY-01   | P1       | UX/UI        | Reequilibrer la grille en faveur du manuscrit                      | M      | Moyen  |
 | SAFE-01  | P1       | Robustesse   | Garder un reorder fiable sans drag souris                          | S      | Moyen  |
+| SAFE-02  | P2       | Robustesse   | Reouvrir le drag souris apres validation Windows/Tauri             | S      | Moyen  |
 | MODEL-01 | P1       | Donnees      | Introduire un modele canonique de document par unites              | L      | Eleve  |
 | MODEL-02 | P1       | Donnees      | Migrer les documents existants vers le modele d'unites             | L      | Eleve  |
 | QA-02    | P1       | Qualite      | Couvrir les invariants du modele scholies                          | M      | Eleve  |
@@ -71,38 +72,37 @@ Ce backlog traduit l'audit en travaux concrets, priorises, avec definition of do
 | PAIR-01  | done        |
 | PAIR-02  | done        |
 | PAIR-03  | done        |
-| LAY-01   | todo        |
-| SAFE-01  | todo        |
-| MODEL-01 | todo        |
-| MODEL-02 | todo        |
-| QA-02    | todo        |
+| LAY-01   | done        |
+| SAFE-01  | done        |
+| SAFE-02  | in progress |
+| MODEL-01 | done        |
+| MODEL-02 | done        |
+| QA-02    | done        |
 | EXP-01   | done        |
-| EXP-02   | todo        |
-| EXP-03   | todo        |
+| EXP-02   | done        |
+| EXP-03   | done        |
 | UX-01    | done        |
-| UX-02    | in progress |
+| UX-02    | done        |
 | UX-03    | in progress |
-| UX-04    | in progress |
-| UX-05    | in progress |
-| UX-06    | in progress |
+| UX-04    | done        |
+| UX-05    | done        |
+| UX-06    | done        |
 | DX-01    | done        |
 
 
 ### Resume
 
-- done: 19
-- in progress: 5
-- todo: 6
+- done: 30
+- in progress: 2
+- todo: 0
 - hors backlog initial (critique): `New linked note` est durci et couvert par tests; le resize pointeur a replanete lors de la validation manuelle Windows/Tauri du 2026-04-02 et reste desactive en attendant une correction de fond
-- reorientation produit le 2026-04-04: `ARCH-01` est formalise; `SCH-03` verrouille maintenant l'invariant `1 bloc manuscrit = 1 scholie gauche max` pour les nouvelles actions; `MAN-01` dote le manuscrit de primitives de structure par bloc; `PAIR-01` centralise maintenant les actions d'unite `bloc + scholie`; `PAIR-02` rend visible l'insertion explicite entre unites, y compris sur document vide; `PAIR-03` autorise maintenant une scholie liee vide, reduite ou developpee sans schema persistant supplementaire; `UX-02`, `UX-03` et une partie de `UX-04` sont maintenant executes via le programme `scholies` ci-dessous
+- reorientation produit le 2026-04-04: `ARCH-01` est formalise; `SCH-03` verrouille maintenant l'invariant `1 bloc manuscrit = 1 scholie gauche max` pour les nouvelles actions; `MAN-01` dote le manuscrit de primitives de structure par bloc; `PAIR-01` centralise maintenant les actions d'unite `bloc + scholie`; `PAIR-02` rend visible l'insertion explicite entre unites, y compris sur document vide; `PAIR-03` autorise maintenant une scholie liee vide, reduite ou developpee sans schema persistant supplementaire; `SAFE-01` verrouille le reorder d'unites par clavier/commandes sans dependre du drag pointeur; `LAY-01` reequilibre maintenant la grille en faveur du manuscrit et allegent visuellement la marge gauche; `UX-04` replie maintenant les aides et simplifie les statuts permanents en aides contextuelles sur demande; `UX-06` recompose maintenant la topbar autour du document courant et de menus plus discrets; `UX-05` installe maintenant une direction visuelle editoriale de type bureau editorial / carnet critique a travers les tokens, le manuscrit, les marges et les modales; `MODEL-01` choisit maintenant un modele canonique JSON persiste en base, synchronise depuis les trois etats legacy via un repository dedie, avec le panneau droit explicite comme notes supplementaires hors invariant d'unite; `MODEL-02` backfill maintenant les documents legacy au demarrage, explicite les cas ambigus (`duplicate`, `unlinked`, `stale`) et garde le triptyque Lexical comme compatibilite de lecture pendant la transition; `QA-02` verrouille maintenant des tests nommes explicitement sur creation / duplication / deplacement / suppression d'unite, ajoute un scenario d'integration sur le bridge `App + manuscrit + marge gauche`, et etend les fixtures de migration aux JSON legacy invalides; `EXP-03` fait maintenant consommer au print preview et au DOCX un document editorial derive du modele canonique, avec roles d'export explicites (`clean` / `working`) et sans relire implicitement les trois etats legacy; `EXP-02` augmente maintenant la fidelite DOCX avec une matrice `editeur -> DOCX` documentee, la preservation des styles inline essentiels dans l'annexe et des marqueurs Unicode fiables pour commentaires et listes; `UX-02` recentre maintenant le centre sur une vraie colonne d'ecriture, aligne les gestes de construction et le vocabulaire sur l'unite, et laisse `UX-03` poursuivre la transformation de la marge gauche via le programme `scholies` ci-dessous
 
 ### Reste a faire priorise
 
-1. `SAFE-01`: rendre le reorder fiable sans dependre du drag souris.
-2. `LAY-01`, `UX-04`, `UX-05`, `UX-06`: retendre la hierarchie visuelle et la chrome autour du nouveau modele.
-3. `MODEL-01`, `MODEL-02`, `QA-02`: basculer la persistance et la couverture de tests vers le modele d'unites une fois l'UX validee.
-4. `EXP-03`, puis `EXP-02`: aligner l'export avec les unites editoriales avant d'augmenter la fidelite DOCX.
-5. Hors backlog initial critique: corriger le crash du resize pointeur sous Windows/Tauri, puis revalider les scenarios resize, changement de document et `New linked note`.
+1. `SAFE-02`: ne reouvrir le drag souris qu'apres une validation Windows/Tauri dedicatee et un ticket ergonomie separe.
+2. `UX-03`: poursuivre le programme `scholies` sur la marge gauche maintenant que le centre manuscrit est recentre.
+3. Hors backlog initial critique: corriger le crash du resize pointeur sous Windows/Tauri, puis revalider les scenarios resize, changement de document et `New linked note`.
 
 ---
 
@@ -190,8 +190,8 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 1. Implementer le vocabulaire et les invariants a partir de `ARCH-01`: `SCH-01`, `SCH-02`, `SCH-03`.
 2. Capitaliser sur les operations de structure cote manuscrit pour introduire les actions niveau unite: `PAIR-01`, `PAIR-02`, `PAIR-03`.
 3. Recomposer l'interface autour des unites et de la lecture: `LAY-01`, `UX-04`, `UX-06`, `UX-05`.
-4. Seulement apres validation manuelle du nouveau comportement, basculer la persistance: `MODEL-01`, `MODEL-02`.
-5. Fermer avec `QA-02` et `EXP-03`, puis reprendre `EXP-02`.
+4. Stabiliser ensuite la persistance canonique par unites: `MODEL-01`, `MODEL-02`.
+5. Poursuivre ensuite avec `SAFE-02`, puis reprendre `UX-02` et `UX-03` sur un socle export stabilise.
 
 ### ARCH-01 - Formaliser le modele editorial par unites
 
@@ -250,7 +250,7 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Regles de transition**
 
-1. Tant que `MODEL-01` n'est pas traite, l'app continue de persister `manuscriptJson`, `leftMarginJson` et `rightMarginJson` separement.
+1. Pendant la transition donnees/export, l'app continue de persister `manuscriptJson`, `leftMarginJson` et `rightMarginJson` separement, avec un modele canonique synchronise et backfill en parallele.
 2. Tant que `SCH-02` n'est pas traite, l'UI continue de fonctionner sur le modele existant, avec une projection derivee a introduire.
 3. Tant que `SCH-03` n'est pas traite, des documents herites peuvent encore contenir plusieurs notes liees a un meme bloc; cet etat doit etre considere comme legacy et non comme un comportement produit valide.
 4. Tant que `SAFE-01` n'est pas ferme, les operations de structure doivent rester faisables sans drag pointeur.
@@ -363,7 +363,7 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
   - ordre;
   - extrait ou meta utiles a l'UI.
 3. Brancher cette projection dans `App.tsx` ou dans un module derive dedie, sans casser le store existant.
-4. Documenter clairement que cette projection reste transitoire tant que `MODEL-01` n'est pas traite.
+4. Documenter clairement que cette projection reste transitoire tant que l'UI editeur continue de raisonner principalement sur les etats Lexical, meme si le modele canonique est maintenant persiste et migre.
 
 **Definition of done**
 
@@ -665,6 +665,15 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### LAY-01 - Reequilibrer la grille en faveur du manuscrit
 
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - les largeurs par defaut et les bornes de `ThreePaneLayout` favorisent maintenant plus clairement le manuscrit;
+  - la colonne centrale gagne en presence visuelle, y compris sans panneau droit;
+  - la marge gauche allege ses toolbars, ses chips et ses blocs pour sortir du rendu "cartes" trop app;
+  - les poignets `Move` de la marge sont masquees tant que le pointer-drag reste desactive, ce qui reduit le bruit et evite une fausse affordance.
+
 **Pourquoi**
 
 - La grille actuelle reste celle de trois panneaux equivalents ou presque.
@@ -700,6 +709,15 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### SAFE-01 - Garder un reorder fiable sans drag souris
 
+**Statut**
+
+- done le 2026-04-04
+- fait:
+  - le pointer-drag de reorder reste explicitement desactive tant qu'une validation Windows/Tauri ne le reouvre pas;
+  - le manuscrit expose maintenant un reorder d'unite au clavier via `Ctrl/Cmd+Alt+Up/Down`, en plus des boutons et de la palette;
+  - la marge gauche route les gestes `Move Earlier/Later` et `Ctrl/Cmd+Alt+Up/Down` vers le reorder d'unite quand la scholie courante est liee, tout en gardant les notes libres et la marge droite sur des deplacements locaux;
+  - des tests couvrent le reorder d'unite declenche depuis une scholie liee, y compris hors contexte `activePane = left`.
+
 **Pourquoi**
 
 - Le drag souris reste instable sous Tauri/WebView2.
@@ -728,7 +746,61 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ---
 
+### SAFE-02 - Reouvrir le drag souris apres validation Windows/Tauri
+
+**Statut**
+
+- in progress le 2026-04-05
+- fait:
+  - pointer-drag rouvert via un kill-switch persistant `pointerBlockDragEnabled` dans les preferences, expose dans `View`, la palette et le menu natif ;
+  - drag d'une scholie gauche liee rebranche sur le coordinateur d'unites au lieu d'un reorder local de marge ;
+  - drag clavier via les handles aligne sur les memes regles (`unite` si scholie liee a gauche, local sinon) ;
+  - rollback runtime : un echec de pointer-capture desactive automatiquement le drag et affiche un message d'etat.
+- reste:
+  - validation manuelle Windows/Tauri dediee avant cloture en `done`.
+
+**Pourquoi**
+
+- Le drag souris reste un confort potentiel, mais il ne doit pas reintroduire un blocage pointeur ou un reorder moins fiable que le clavier.
+
+**Objectif**
+
+- Reconsiderer le drag souris uniquement apres validation runtime et garde-fous suffisants.
+
+**Travaux**
+
+1. Valider a nouveau le pointer-drag sur Windows/Tauri sans capture bloquee ni gel de clics.
+2. Verifier que le drag respecte bien le modele par unites et ne contourne pas `SAFE-01`.
+3. Prevoir un rollback simple si le runtime reintroduit un etat pointeur bloque.
+
+**Definition of done**
+
+- Le drag souris est teste sur Windows/Tauri sans regression pointeur.
+- Le reorder souris n'est qu'un confort supplementaire, jamais un chemin critique.
+
+**Dependances**
+
+- `SAFE-01`
+
+---
+
 ### MODEL-01 - Introduire un modele canonique de document par unites
+
+**Statut**
+
+- done le 2026-04-05
+- choix retenu:
+  - un stockage canonique unique `document_unit_models` en SQLite plutot qu'une decomposition prematuree en `document_units`;
+  - un `model_json` versionne, derive en unites editoriales (`units`) avec `manuscript` + `scholie` primaire optionnelle;
+  - le panneau droit reste explicite comme `rightNotes`, hors invariant d'unite, sous le mode `supplemental-notes`;
+  - les doublons legacy, scholies libres et liens perimes restent representes dans `supplementalLeftNotes` + `legacyDiagnostics`, sans violer la regle `1 unite = 0/1 scholie gauche`.
+- fait:
+  - migration SQL `002_document_unit_models`;
+  - module de derivee canonique depuis `manuscript_states` / `margin_left_states` / `margin_right_states`;
+  - repository dedie de lecture/synchronisation vers `document_unit_models`;
+  - synchronisation automatique a la creation, a l'ouverture normalisee et a chaque sauvegarde editeur.
+- suite prevue:
+  - `MODEL-02` backfill les documents existants, garde le triptyque Lexical en compatibilite de lecture pendant la transition, puis prepare la bascule de lecture canonique.
 
 **Pourquoi**
 
@@ -763,6 +835,22 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 ---
 
 ### MODEL-02 - Migrer les documents existants vers le modele d'unites
+
+**Statut**
+
+- done le 2026-04-05
+- choix retenu:
+  - backfill systematique de `document_unit_models` au demarrage via `seedInitialData`, sans attendre l'ouverture manuelle de chaque brouillon;
+  - conservation du triptyque Lexical comme compatibilite de lecture/ecriture pendant la transition, avec synchronisation canonique en parallele;
+  - regles explicites pour les cas ambigus legacy: doublons de scholies vers `duplicate-left-link`, scholies libres vers `unlinked-left-note`, liens perimes vers `stale-left-link`;
+  - signalement des documents a revoir via le rapport de migration et `legacyDiagnostics` dans le modele canonique.
+- fait:
+  - helper de migration `migrateLegacyDocumentsToCanonicalModel` sur tous les documents existants;
+  - normalisation prealable des `blockId` manuscrit avant backfill pour eviter toute perte de passages dans le modele canonique;
+  - tests sur documents legacy non ouverts, cas ambigus et seed initial avec backfill automatique.
+- suite prevue:
+  - `QA-02` verrouille maintenant les invariants du couple `bloc + scholie`;
+  - `EXP-03` fait maintenant consommer plus directement le modele canonique cote export avant une bascule de lecture complete.
 
 **Pourquoi**
 
@@ -802,6 +890,16 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### QA-02 - Couvrir les invariants du modele scholies
 
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - tests nommes explicitement sur les invariants creation / duplication / deplacement / suppression d'unite;
+  - scenario d'integration couvrant le bridge `App + manuscrit + marge gauche` via les handles d'editeurs;
+  - extension des fixtures de migration aux cas legacy ambigus et au JSON invalide, avec signalement dans le rapport de migration.
+- effet attendu:
+  - une regression sur la relation `bloc principal <-> scholie` casse maintenant la suite automatisee avant d'atteindre l'export ou la migration.
+
 **Pourquoi**
 
 - Le futur comportement repose sur des invariants plus stricts que l'etat actuel.
@@ -838,6 +936,17 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 ---
 
 ### EXP-03 - Aligner l'export avec les unites editoriales
+
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - introduction d'un document d'export editorial derive du modele canonique, avec matrice explicite par profil `clean` / `working`;
+  - print preview aligne sur ce document editorial, en respectant l'ordre des unites plutot qu'une lecture implicite des trois etats legacy;
+  - export DOCX Tauri branche sur le payload editorial, avec scholie primaire en commentaire, notes droites en footnotes et supplemental left notes en annexe pour le profil `working`;
+  - couverture de tests sur la matrice d'export et durcissement de l'ouverture des JSON legacy invalides via un fallback d'etats sains.
+- effet attendu:
+  - l'export suit maintenant explicitement le modele editorial migre, ce qui a servi de base stable a `EXP-02`.
 
 **Pourquoi**
 
@@ -1153,6 +1262,17 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### EXP-02 - Augmenter la fidelite de l'export DOCX
 
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - ajout d'une matrice `editeur -> DOCX` dans le README pour expliciter ce qui est exporte en `clean` et `working`;
+  - preservation des styles inline essentiels dans les annexes `Supplemental Scholies` cote DOCX, au lieu d'un texte aplati;
+  - marqueurs Unicode fiables pour commentaires et listes afin d'eviter les glyphes corrompus dans les sorties Word;
+  - tests Rust sur la conversion des segments d'export et la conservation des segments styles pour les notes supplementaires.
+- effet attendu:
+  - le DOCX reste semantique et robuste, mais il ressemble maintenant davantage au manuscrit et a ses notes sur les cas supportes.
+
 **Pourquoi**
 
 - Le produit gagnera en valeur si le DOCX ressemble davantage au manuscrit.
@@ -1209,6 +1329,16 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### UX-02 - Recentrer l'app sur l'ecriture par unites
 
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - le centre manuscrit repose maintenant sur une vraie colonne de texte, plus calme et moins “panneau d'outil”, avec des blocs alleges et une largeur de lecture plus coherente ;
+  - le document vide et les points d'insertion parlent explicitement en `unites`, y compris sur petit ecran ou le manuscrit remonte avant la marge ;
+  - les actions, statuts et commandes principales emploient maintenant le vocabulaire `unite` plutot que `passage`, ce qui clarifie la structure editoriale.
+- reste:
+  - validation visuelle Windows/Tauri sur document vide, document long et largeur etroite.
+
 **Pourquoi**
 
 - Le manuscrit n'est pas encore la zone dominante de l'interface.
@@ -1247,6 +1377,19 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### UX-03 - Transformer la marge gauche en appareil de scholies
 
+**Statut**
+
+- in progress le 2026-04-05
+- fait:
+  - la marge gauche adopte un header plus editorial, avec un sous-titre de glosses critiques plutot qu'un langage de panneau technique ;
+  - les metadonnees de bloc ne montrent plus d'identifiants techniques et l'extrait du passage lie est davantage mis en scene comme repere critique ;
+  - les actions secondaires de la marge gauche sont encore accessibles, mais leur chrome est plus discret pour laisser les scholies primer visuellement ;
+  - le bouton `+` du header devient l'entree primaire pour creer une scholie, tandis que la toolbar immediate ne duplique plus cette action et se recentre sur des actions secondaires ;
+  - l'extrait lie des scholies suit maintenant l'etat live du manuscrit sans attendre l'autosave.
+- reste:
+  - validation visuelle Windows/Tauri sur documents charges, scholies vides/reduites, et interaction avec les actions secondaires ;
+  - decider s'il faut encore reduire ou redistribuer certaines actions de toolbar si la marge reste trop "outillee" a l'usage.
+
 **Pourquoi**
 
 - La marge gauche fonctionne, mais son langage visuel actuel reste celui d'un panneau de notes ou de commandes.
@@ -1283,6 +1426,15 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 ---
 
 ### UX-04 - Reduire le bruit permanent et rendre l'aide contextuelle
+
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - les aides `Help` et les groupes `Format` / `Structure` / `Actions` s'ouvrent maintenant comme popovers sur demande au lieu d'etirer les barres de travail;
+  - les statuts manuscrit et marge sont reduits a 1 ou 2 informations immediatement utiles, avec plus de bruit retire par defaut;
+  - la decouvrabilite des raccourcis reste assuree via un point d'entree `Shortcuts` dans chaque panneau;
+  - les signaux critiques (`Awaiting passage`, `Empty scholie`, `Legacy duplicates`) restent visibles quand ils portent une action ou un risque reel.
 
 **Pourquoi**
 
@@ -1321,6 +1473,15 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### UX-05 - Installer une direction visuelle editoriale complete
 
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - l'axe visuel retenu est maintenant un `bureau editorial / carnet critique`, avec une palette papier plus chaude, une hierarchie typographique renforcee et des elevations moins "admin";
+  - les tokens et composants principaux ont ete realignes sur cette direction: shell, topbar, boutons, manuscrit, marges, modales, command palette, etats vides et page preview;
+  - la coherence visuelle est maintenant lisible entre le document principal, les scholies, les notes droites et les surfaces de dialogue;
+  - les captures avant/apres restent un reliquat de validation/documentation, pas un blocage technique du ticket.
+
 **Pourquoi**
 
 - L'app est encore dans une esthetique "dark utility" generique.
@@ -1357,6 +1518,15 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 ---
 
 ### UX-06 - Recomposer la topbar et la navigation document
+
+**Statut**
+
+- done le 2026-04-05
+- fait:
+  - la topbar rehierarchise maintenant les actions visibles en `Document`, `Export`, `View` et `Quick Actions` au lieu d'aligner plusieurs boutons de meme niveau;
+  - le nom du document courant gagne en importance visuelle, tandis que le preset actif devient un contexte compact et ouvrable depuis la topbar;
+  - les actions frequentes d'ecriture restent accessibles en haut, mais les reglages plus applicatifs restent surtout portes par le menu natif et la palette;
+  - les menus de topbar ferment apres action et les petites largeurs desktop sont traitees par une mise en page plus souple.
 
 **Pourquoi**
 
@@ -1420,43 +1590,20 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 ### Sprint 7
 
-- `SAFE-01`
-- `LAY-01`
+- `SAFE-02`
 
 **But**
 
-- Fiabiliser la manipulation structurelle et commencer a aerer l'interface maintenant que l'unite est plus legere.
+- Reevaluer eventuellement le drag souris une fois les chemins critiques et l'export stabilises.
 
 ### Sprint 8
 
-- `UX-04`
-- `UX-06`
-
-**But**
-
-- Refaire respirer l'interface autour du manuscrit et des scholies maintenant que le socle unitaire existe.
-
-### Sprint 9
-
-- `MODEL-01`
-- `QA-02`
-- `EXP-03`
-
-**But**
-
-- Stabiliser la persistance canonique et l'alignement export une fois l'UX d'unites validee.
-
-### Sprint 10+
-
-- `MODEL-02`
-- `EXP-02`
 - `UX-02`
 - `UX-03`
-- `UX-05`
 
 **But**
 
-- Basculer du socle durci vers une experience editoriale pleinement assumee.
+- Reprendre les chantiers exploratoires et les conforts secondaires une fois le socle donnees/export stabilise.
 
 ---
 
@@ -1464,13 +1611,12 @@ Ce programme re-scopie `UX-02`, `UX-03` et une partie de `UX-04` pour faire evol
 
 **Priorite actuelle**
 
-- `SAFE-01`: reorder fiable sans drag souris
-- `LAY-01`: reequilibrer la grille en faveur du manuscrit
-- `MODEL-01`: introduire un modele canonique par unites
+- `SAFE-02`: ne reconsiderer le drag pointeur qu'apres validation Windows/Tauri dediee
+- `UX-02`, `UX-03`: poursuivre ensuite le programme `scholies`
 
 **Note**
 
-- La liste detaillee ci-dessous est historique et n'est plus l'ordre d'ouverture recommande depuis la cloture de `SCH-03`, `SCH-04`, `MAN-01`, `PAIR-01` et `PAIR-02`.
+- La liste detaillee ci-dessous est historique et n'est plus l'ordre d'ouverture recommande depuis la cloture de `SCH-03`, `SCH-04`, `MAN-01`, `PAIR-01`, `PAIR-02`, `PAIR-03` et `SAFE-01`.
 
 ### Ticket 1
 

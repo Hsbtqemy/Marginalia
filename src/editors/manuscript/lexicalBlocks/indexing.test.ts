@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildManuscriptExcerptIndexFromLexicalJson,
+  buildManuscriptExcerptIndexFromSerializedLexicalState,
   collectManuscriptBlockSummariesFromLexicalJson,
 } from "./indexing";
 
@@ -50,4 +51,33 @@ test("buildManuscriptExcerptIndexFromLexicalJson normalizes whitespace and trunc
   assert.deepEqual(buildManuscriptExcerptIndexFromLexicalJson(lexicalJson), {
     "p-2": "Many spaces and lines",
   });
+});
+
+test("buildManuscriptExcerptIndexFromSerializedLexicalState mirrors the JSON helper for live editor state", () => {
+  const serializedState = {
+    root: {
+      children: [
+        {
+          type: "paragraph",
+          $: { blockId: "p-3" },
+          children: [{ type: "text", text: "Live excerpt" }],
+        },
+        {
+          type: "list",
+          children: [
+            {
+              type: "listitem",
+              $: { blockId: "li-3" },
+              children: [{ type: "text", text: "Live list item" }],
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  assert.deepEqual(
+    buildManuscriptExcerptIndexFromSerializedLexicalState(serializedState),
+    buildManuscriptExcerptIndexFromLexicalJson(JSON.stringify(serializedState)),
+  );
 });

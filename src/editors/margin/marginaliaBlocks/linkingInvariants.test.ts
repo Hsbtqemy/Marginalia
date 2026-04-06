@@ -43,7 +43,7 @@ test("margin summaries ignore malformed blocks and keep document order for linke
   });
 });
 
-test("manuscript excerpt index and linked-id normalization stay aligned after stale links are removed", () => {
+test("manuscript excerpt index and linked-id normalization keep every passage addressable for unit-based tooling", () => {
   const manuscriptJson = JSON.stringify({
     root: {
       children: [
@@ -96,9 +96,11 @@ test("manuscript excerpt index and linked-id normalization stay aligned after st
   const leftLinkIndex = buildMarginLinkIndexFromLexicalJson(leftMarginJson);
   const rightLinkIndex = buildMarginLinkIndexFromLexicalJson(rightMarginJson);
 
-  assert.deepEqual(Object.keys(excerptIndex).sort(), ["keep-1", "keep-2"]);
+  assert.deepEqual(Object.keys(excerptIndex).sort(), ["drop-1", "drop-2", "keep-1", "keep-2"]);
   assert.deepEqual(leftLinkIndex, { "keep-1": ["left-1"] });
   assert.deepEqual(rightLinkIndex, { "keep-2": ["right-1"] });
   assert.equal(excerptIndex["keep-1"], "Keep this linked paragraph");
   assert.equal(excerptIndex["keep-2"], "Keep linked list item");
+  assert.equal(excerptIndex["drop-1"], "Drop this stale paragraph");
+  assert.equal(excerptIndex["drop-2"], "Drop stale list item");
 });

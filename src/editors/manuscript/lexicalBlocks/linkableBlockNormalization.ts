@@ -1,4 +1,4 @@
-import { collectMarginBlockSummariesFromLexicalJson } from "../../margin/marginaliaBlocks/indexing";
+import { newUuid } from "../../../utils/uuid";
 
 type LexicalNodeRecord = Record<string, unknown>;
 
@@ -13,47 +13,25 @@ function readBlockId(node: LexicalNodeRecord): string | null {
     : null;
 }
 
-function clearBlockId(node: LexicalNodeRecord): boolean {
+function setBlockId(node: LexicalNodeRecord): boolean {
   const state = node.$;
-  if (!state || typeof state !== "object") {
+  const existing = readBlockId(node);
+  if (existing) {
     return false;
   }
 
-  const mutableState = { ...(state as Record<string, unknown>) };
-  if (typeof mutableState.blockId !== "string") {
-    return false;
-  }
-
-  delete mutableState.blockId;
-
-  if (Object.keys(mutableState).length === 0) {
-    delete node.$;
-  } else {
-    node.$ = mutableState;
-  }
+  const mutableState = state && typeof state === "object" ? { ...(state as Record<string, unknown>) } : {};
+  mutableState.blockId = newUuid();
+  node.$ = mutableState;
 
   return true;
 }
 
-function linkedBlockIdSet(leftMarginJson: string, rightMarginJson: string): Set<string> {
-  const linkedIds = new Set<string>();
-
-  for (const summary of collectMarginBlockSummariesFromLexicalJson(leftMarginJson)) {
-    if (summary.linkedManuscriptBlockId) {
-      linkedIds.add(summary.linkedManuscriptBlockId);
-    }
-  }
-
-  for (const summary of collectMarginBlockSummariesFromLexicalJson(rightMarginJson)) {
-    if (summary.linkedManuscriptBlockId) {
-      linkedIds.add(summary.linkedManuscriptBlockId);
-    }
-  }
-
-  return linkedIds;
+function isTopLevelManuscriptBlock(node: LexicalNodeRecord): boolean {
+  return node.type === "paragraph" || node.type === "heading" || node.type === "quote";
 }
 
-function normalizeTopLevelBlockIds(rootChildren: LexicalNodeRecord[], keepIds: Set<string>): boolean {
+function normalizeTopLevelBlockIds(rootChildren: LexicalNodeRecord[]): boolean {
   let changed = false;
 
   for (const child of rootChildren) {
@@ -67,17 +45,15 @@ function normalizeTopLevelBlockIds(rootChildren: LexicalNodeRecord[], keepIds: S
           continue;
         }
 
-        const blockId = readBlockId(listItem as LexicalNodeRecord);
-        if (blockId && !keepIds.has(blockId)) {
-          changed = clearBlockId(listItem as LexicalNodeRecord) || changed;
+        if ((listItem as LexicalNodeRecord).type === "listitem") {
+          changed = setBlockId(listItem as LexicalNodeRecord) || changed;
         }
       }
       continue;
     }
 
-    const blockId = readBlockId(child);
-    if (blockId && !keepIds.has(blockId)) {
-      changed = clearBlockId(child) || changed;
+    if (isTopLevelManuscriptBlock(child)) {
+      changed = setBlockId(child) || changed;
     }
   }
 
@@ -86,8 +62,8 @@ function normalizeTopLevelBlockIds(rootChildren: LexicalNodeRecord[], keepIds: S
 
 export function normalizeLinkedManuscriptBlocks(
   manuscriptJson: string,
-  leftMarginJson: string,
-  rightMarginJson: string,
+  _leftMarginJson: string,
+  _rightMarginJson: string,
 ): { lexicalJson: string; changed: boolean } {
   if (!manuscriptJson) {
     return { lexicalJson: manuscriptJson, changed: false };
@@ -105,8 +81,7 @@ export function normalizeLinkedManuscriptBlocks(
       return { lexicalJson: manuscriptJson, changed: false };
     }
 
-    const keepIds = linkedBlockIdSet(leftMarginJson, rightMarginJson);
-    const changed = normalizeTopLevelBlockIds(rootChildren, keepIds);
+    const changed = normalizeTopLevelBlockIds(rootChildren);
 
     if (!changed) {
       return { lexicalJson: manuscriptJson, changed: false };
